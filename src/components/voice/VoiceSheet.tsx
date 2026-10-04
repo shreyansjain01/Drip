@@ -32,8 +32,10 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
   const [countdown, setCountdown] = useState<number | null>(null);
   const [waveformLevels, setWaveformLevels] = useState<number[]>(Array(24).fill(8));
   const [isSaving, setIsSaving] = useState(false);
-  const [recognitionInstance, setRecognitionInstance] = useState<any>(null);
-  const [speechSupported, setSpeechSupported] = useState(true);
+  
+  const recognitionRef = React.useRef<any>(null);
+  const isListeningRef = React.useRef<boolean>(false);
+  const audioIntervalRef = React.useRef<any>(null);
 
   // Auto-save countdown timer after voice detection
   useEffect(() => {
@@ -50,102 +52,120 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
     return () => clearTimeout(timer);
   }, [countdown, parsedResult]);
 
-  // Check speech recognition capability on mount/open
+  // Clean up when modal closes
   useEffect(() => {
     if (!isOpen) {
+      stopListening();
       setParsedResult(null);
       setTranscript('');
       setInputText('');
       setCountdown(null);
       setIsSaving(false);
-      setIsListening(false);
-      if (recognitionInstance) {
-        try {
-          recognitionInstance.stop();
-        } catch {}
-      }
-      return;
     }
+  }, [isOpen]);
 
+  // Waveform animation while listening
+  useEffect(() => {
+    if (isListening) {
+      audioIntervalRef.current = setInterval(() => {
+        setWaveformLevels(Array.from({ length: 24 }, () => 6 + Math.random() * 26));
+      }, 100);
+    } else {
+      if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
+      setWaveformLevels(Array(24).fill(6));
+    }
+    return () => {
+      if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
+    };
+  }, [isListening]);
+
+  const startListening = () => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      setSpeechSupported(false);
-    } else {
-      setSpeechSupported(true);
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = true;
-        recognition.lang = 'en-IN';
-
-        recognition.onstart = () => {
-          setIsListening(true);
-          setTranscript('');
-          setParsedResult(null);
-          setCountdown(null);
-        };
-
-        recognition.onresult = (event: any) => {
-          let currentText = '';
-          for (let i = 0; i < event.results.length; i++) {
-            currentText += event.results[i][0].transcript;
-          }
-          setTranscript(currentText);
-          setInputText(currentText);
-
-          // Random waveform bars animation while listening
-          setWaveformLevels(Array.from({ length: 24 }, () => 6 + Math.random() * 26));
-
-          if (event.results[0].isFinal) {
-            handleFinalTranscript(currentText);
-          }
-        };
-
-        recognition.onerror = () => {
-          setIsListening(false);
-        };
-
-        recognition.onend = () => {
-          setIsListening(false);
-        };
-
-        setRecognitionInstance(recognition);
-
-        // Attempt initial start if supported
-        try {
-          recognition.start();
-        } catch {}
-      } catch {
-        setSpeechSupported(false);
-      }
+      setTranscript('Speech recognition is not supported in this browser. You can type or use the keyboard mic.');
+      return;
     }
 
-    return () => {
-      if (recognitionInstance) {
+    try {
+      // Stop any existing instance
+      if (recognitionRef.current) {
         try {
-          recognitionInstance.stop();
+          recognitionRef.current.abort();
         } catch {}
       }
-    };
-  }, [isOpen]);
 
-  const toggleMic = () => {
-    if (isListening && recognitionInstance) {
-      try {
-        recognitionInstance.stop();
-        setIsListening(false);
-      } catch {}
-    } else if (recognitionInstance) {
-      try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true; // Keep listening on mobile without stopping after 1 second
+      recognition.interimResults = true; // Show live transcription
+      recognition.maxAlternatives = 1;
+      recognition.lang = navigator.language || 'en-IN';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        isListeningRef.current = true;
         setTranscript('');
         setParsedResult(null);
-        recognitionInstance.start();
-        setIsListening(true);
-      } catch {
+        setCountdown(null);
+      };
+
+      recognition.onresult = (event: any) => {
+        let currentText = '';
+        for (let i = 0; i < event.results.length; i++) {
+          currentText += event.results[i][0].transcript;
+        }
+        setTranscript(currentText);
+        setInputText(currentText);
+
+        // If high-confidence or pause detected, prepare result
+        const lastResult = event.results[event.results.length - 1];
+        if (lastResult.isFinal && currentText.trim()) {
+          handleFinalTranscript(currentText);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        // 'no-speech' is normal when user is thinking, don't abort
+        if (event.error === 'no-speech') {
+          return;
+        }
         setIsListening(false);
+        isListeningRef.current = false;
+      };
+
+      recognition.onend = () => {
+        // If still marked as listening and no result yet, keep state or finish
+        setIsListening(false);
+        isListeningRef.current = false;
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch {
+      setIsListening(false);
+      isListeningRef.current = false;
+    }
+  };
+
+  const stopListening = () => {
+    setIsListening(false);
+    isListeningRef.current = false;
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+    }
+  };
+
+  const toggleMic = () => {
+    if (isListening) {
+      stopListening();
+      if (transcript.trim()) {
+        handleFinalTranscript(transcript);
       }
+    } else {
+      startListening();
     }
   };
 
@@ -157,6 +177,9 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
     setEditableLabel(result.label);
     const matched = DEFAULT_CATEGORIES.find((c) => c.name === result.category);
     if (matched) setSelectedCatId(matched.id);
+
+    // Stop listening once speech is recognized
+    stopListening();
 
     // Start a 2-second auto-save countdown for hands-free logging
     if (result.amountPaise > 0) {
@@ -276,7 +299,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
             </div>
 
             <p className="font-title text-[16px] font-semibold text-black mt-0.5">
-              {isListening ? 'Listening...' : transcript || 'Tap mic to speak or enter below'}
+              {isListening ? '🎙️ Listening... Speak now' : transcript || 'Tap mic to speak or enter below'}
             </p>
 
             {/* Quick Natural Voice / Text Bar (Safari & Mobile Dictation Friendly) */}
@@ -289,10 +312,13 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
                 className="flex-1 bg-transparent text-[14px] text-black placeholder:text-black/45 font-medium focus:outline-none"
               />
               <button
-                type="submit"
-                className="px-3 py-1 bg-black text-white text-[12px] font-semibold rounded-full active:scale-95 transition-transform cursor-pointer"
+                type={isListening ? 'button' : 'submit'}
+                onClick={isListening ? toggleMic : undefined}
+                className={`px-3 py-1 text-[12px] font-semibold rounded-full active:scale-95 transition-transform cursor-pointer ${
+                  isListening ? 'bg-[#8E7DF0] text-white animate-pulse' : 'bg-black text-white'
+                }`}
               >
-                Add
+                {isListening ? 'Done' : 'Add'}
               </button>
             </form>
 
