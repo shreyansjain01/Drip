@@ -3,7 +3,7 @@ import AppShell from '../layouts/AppShell.astro';
 import ScreenHeader from '../components/ui/ScreenHeader.astro';
 import Drip from '../components/ui/Drip.astro';
 import BottomNav from '../components/ui/BottomNav.astro';
-import { FileText, Table, Check } from 'lucide-react';
+import { FileText, Table, Check, Loader2 } from 'lucide-react';
 ---
 
 <AppShell title="Export Data — Drip">
@@ -19,17 +19,33 @@ import { FileText, Table, Check } from 'lucide-react';
         <p class="font-caption text-black/60 text-[13px] mt-0.5">Choose the period for your exported report</p>
 
         <!-- Date range chips -->
-        <div class="flex flex-wrap gap-2 mt-3">
-          <button type="button" class="px-4 py-2 bg-black text-white rounded-full text-[13px] font-medium shadow-sm">
+        <div class="flex flex-wrap gap-2 mt-3" id="date-range-container">
+          <button
+            type="button"
+            data-range="this_month"
+            class="range-chip px-4 py-2 bg-black text-white rounded-full text-[13px] font-medium shadow-sm transition-all"
+          >
             This month
           </button>
-          <button type="button" class="px-4 py-2 bg-white/60 text-black rounded-full text-[13px] font-medium hover:bg-white active:scale-95 transition-all">
+          <button
+            type="button"
+            data-range="3_months"
+            class="range-chip px-4 py-2 bg-white/60 text-black rounded-full text-[13px] font-medium hover:bg-white active:scale-95 transition-all"
+          >
             Last 3 months
           </button>
-          <button type="button" class="px-4 py-2 bg-white/60 text-black rounded-full text-[13px] font-medium hover:bg-white active:scale-95 transition-all">
+          <button
+            type="button"
+            data-range="this_year"
+            class="range-chip px-4 py-2 bg-white/60 text-black rounded-full text-[13px] font-medium hover:bg-white active:scale-95 transition-all"
+          >
             This year
           </button>
-          <button type="button" class="px-4 py-2 bg-white/60 text-black rounded-full text-[13px] font-medium hover:bg-white active:scale-95 transition-all">
+          <button
+            type="button"
+            data-range="all"
+            class="range-chip px-4 py-2 bg-white/60 text-black rounded-full text-[13px] font-medium hover:bg-white active:scale-95 transition-all"
+          >
             Everything
           </button>
         </div>
@@ -37,41 +53,41 @@ import { FileText, Table, Check } from 'lucide-react';
 
       <!-- Two Large White Download Tiles -->
       <div class="flex flex-col gap-3.5 mt-2">
-        <!-- PDF Download Tile -->
-        <a
-          href="/api/export/pdf"
-          download="Drip-Report.pdf"
-          class="w-full bg-white rounded-[24px] p-5 shadow-md flex items-center justify-between group active:scale-[0.98] transition-all hover:bg-white/95"
+        <!-- PDF Download Button -->
+        <button
+          id="export-pdf-btn"
+          type="button"
+          class="w-full bg-white rounded-[24px] p-5 shadow-md flex items-center justify-between group active:scale-[0.98] transition-all hover:bg-white/95 text-left cursor-pointer"
         >
           <div class="flex items-center gap-4">
             <div class="w-14 h-14 rounded-[16px] bg-[#B8ACFA]/30 flex items-center justify-center text-black">
               <FileText size={28} strokeWidth={1.75} />
             </div>
-            <div class="flex flex-col text-left">
-              <span class="font-body-500 text-[18px] text-black font-semibold">Download PDF</span>
+            <div class="flex flex-col">
+              <span id="pdf-btn-label" class="font-body-500 text-[18px] text-black font-semibold">Download PDF</span>
               <span class="font-caption text-black/50 text-[13px]">Branded summary, category split & goals</span>
             </div>
           </div>
-          <span class="text-black/40 group-hover:text-black transition-colors font-bold text-lg">→</span>
-        </a>
+          <span id="pdf-btn-arrow" class="text-black/40 group-hover:text-black transition-colors font-bold text-lg">→</span>
+        </button>
 
-        <!-- Excel Download Tile -->
-        <a
-          href="/api/export/xlsx"
-          download="Drip-Report.xlsx"
-          class="w-full bg-white rounded-[24px] p-5 shadow-md flex items-center justify-between group active:scale-[0.98] transition-all hover:bg-white/95"
+        <!-- Excel Download Button -->
+        <button
+          id="export-xlsx-btn"
+          type="button"
+          class="w-full bg-white rounded-[24px] p-5 shadow-md flex items-center justify-between group active:scale-[0.98] transition-all hover:bg-white/95 text-left cursor-pointer"
         >
           <div class="flex items-center gap-4">
             <div class="w-14 h-14 rounded-[16px] bg-[#D8D1FD] flex items-center justify-center text-black">
               <Table size={28} strokeWidth={1.75} />
             </div>
-            <div class="flex flex-col text-left">
-              <span class="font-body-500 text-[18px] text-black font-semibold">Download Excel</span>
+            <div class="flex flex-col">
+              <span id="xlsx-btn-label" class="font-body-500 text-[18px] text-black font-semibold">Download Excel</span>
               <span class="font-caption text-black/50 text-[13px]">5 styled sheets with formulas & filters</span>
             </div>
           </div>
-          <span class="text-black/40 group-hover:text-black transition-colors font-bold text-lg">→</span>
-        </a>
+          <span id="xlsx-btn-arrow" class="text-black/40 group-hover:text-black transition-colors font-bold text-lg">→</span>
+        </button>
       </div>
 
       <p class="font-caption text-black/50 text-[12px] text-center mt-4">
@@ -81,4 +97,109 @@ import { FileText, Table, Check } from 'lucide-react';
   </div>
 
   <BottomNav currentPath="/export" />
+
+  <script>
+    let selectedRange = 'this_month';
+    const chips = document.querySelectorAll('.range-chip');
+
+    chips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const range = chip.getAttribute('data-range');
+        if (!range) return;
+        selectedRange = range;
+
+        chips.forEach((c) => {
+          c.classList.remove('bg-black', 'text-white', 'shadow-sm');
+          c.classList.add('bg-white/60', 'text-black');
+        });
+
+        chip.classList.remove('bg-white/60', 'text-black');
+        chip.classList.add('bg-black', 'text-white', 'shadow-sm');
+      });
+    });
+
+    function getLocalPayload() {
+      let expenses = [];
+      let goals = [];
+      let userName = 'User';
+      let salary = 50000;
+      let expensePct = 60;
+      let savingsPct = 40;
+
+      try {
+        const localExpenses = localStorage.getItem('drip_local_expenses');
+        if (localExpenses) expenses = JSON.parse(localExpenses);
+
+        const localGoals = localStorage.getItem('drip_user_goals');
+        if (localGoals) goals = JSON.parse(localGoals);
+
+        const localName = localStorage.getItem('drip_user_name');
+        if (localName) userName = localName;
+
+        const localSalary = localStorage.getItem('drip_user_salary');
+        if (localSalary) salary = Number(localSalary);
+
+        const localExpensePct = localStorage.getItem('drip_expense_pct');
+        if (localExpensePct) expensePct = Number(localExpensePct);
+
+        const localSavingsPct = localStorage.getItem('drip_savings_pct');
+        if (localSavingsPct) savingsPct = Number(localSavingsPct);
+      } catch (err) {
+        console.error('Error loading export payload:', err);
+      }
+
+      return {
+        userName,
+        salary,
+        expensePct,
+        savingsPct,
+        expenses,
+        goals,
+        range: selectedRange
+      };
+    }
+
+    async function triggerExport(type: 'pdf' | 'xlsx') {
+      const payload = getLocalPayload();
+      const filename = type === 'pdf' ? `Drip-Report-${selectedRange}.pdf` : `Drip-Report-${selectedRange}.xlsx`;
+
+      const btn = document.getElementById(type === 'pdf' ? 'export-pdf-btn' : 'export-xlsx-btn');
+      const label = document.getElementById(type === 'pdf' ? 'pdf-btn-label' : 'xlsx-btn-label');
+      const arrow = document.getElementById(type === 'pdf' ? 'pdf-btn-arrow' : 'xlsx-btn-arrow');
+
+      if (label) label.textContent = 'Generating...';
+      if (arrow) arrow.textContent = '⏳';
+      if (btn) btn.style.opacity = '0.7';
+
+      try {
+        const response = await fetch(`/api/export/${type}?range=${encodeURIComponent(selectedRange)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error('Failed to generate export');
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error(err);
+        alert('Could not download file. Please try again.');
+      } finally {
+        if (label) label.textContent = type === 'pdf' ? 'Download PDF' : 'Download Excel';
+        if (arrow) arrow.textContent = '→';
+        if (btn) btn.style.opacity = '1';
+      }
+    }
+
+    document.getElementById('export-pdf-btn')?.addEventListener('click', () => triggerExport('pdf'));
+    document.getElementById('export-xlsx-btn')?.addEventListener('click', () => triggerExport('xlsx'));
+  </script>
 </AppShell>
