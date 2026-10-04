@@ -1,0 +1,84 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+import ScreenHeader from '../components/ui/ScreenHeader.astro';
+import Drip from '../components/ui/Drip.astro';
+import BottomNav from '../components/ui/BottomNav.astro';
+import { FileText, Table, Check } from 'lucide-react';
+---
+
+<AppShell title="Export Data — Drip">
+  <div class="w-full flex-1 flex flex-col bg-black text-white relative select-none pb-28">
+    <ScreenHeader title="Export Data" showBack={true} rightAction="more" textColor="text-white" />
+
+    <!-- Drip into Lavender surface -->
+    <Drip variant="top" fill="var(--lavender-500)" seed="home" />
+
+    <section class="flex-1 bg-[#B8ACFA] text-black px-5 pt-3 pb-8 flex flex-col gap-5 min-h-[500px]">
+      <div>
+        <h2 class="font-section text-black font-semibold">Select Date Range</h2>
+        <p class="font-caption text-black/60 text-[13px] mt-0.5">Choose the period for your exported report</p>
+
+        <!-- Date range chips -->
+        <div class="flex flex-wrap gap-2 mt-3">
+          <button type="button" class="px-4 py-2 bg-black text-white rounded-full text-[13px] font-medium shadow-sm">
+            This month
+          </button>
+          <button type="button" class="px-4 py-2 bg-white/60 text-black rounded-full text-[13px] font-medium hover:bg-white active:scale-95 transition-all">
+            Last 3 months
+          </button>
+          <button type="button" class="px-4 py-2 bg-white/60 text-black rounded-full text-[13px] font-medium hover:bg-white active:scale-95 transition-all">
+            This year
+          </button>
+          <button type="button" class="px-4 py-2 bg-white/60 text-black rounded-full text-[13px] font-medium hover:bg-white active:scale-95 transition-all">
+            Everything
+          </button>
+        </div>
+      </div>
+
+      <!-- Two Large White Download Tiles -->
+      <div class="flex flex-col gap-3.5 mt-2">
+        <!-- PDF Download Tile -->
+        <a
+          href="/api/export/pdf"
+          download="Drip-Report.pdf"
+          class="w-full bg-white rounded-[24px] p-5 shadow-md flex items-center justify-between group active:scale-[0.98] transition-all hover:bg-white/95"
+        >
+          <div class="flex items-center gap-4">
+            <div class="w-14 h-14 rounded-[16px] bg-[#B8ACFA]/30 flex items-center justify-center text-black">
+              <FileText size={28} strokeWidth={1.75} />
+            </div>
+            <div class="flex flex-col text-left">
+              <span class="font-body-500 text-[18px] text-black font-semibold">Download PDF</span>
+              <span class="font-caption text-black/50 text-[13px]">Branded summary, category split & goals</span>
+            </div>
+          </div>
+          <span class="text-black/40 group-hover:text-black transition-colors font-bold text-lg">→</span>
+        </a>
+
+        <!-- Excel Download Tile -->
+        <a
+          href="/api/export/xlsx"
+          download="Drip-Report.xlsx"
+          class="w-full bg-white rounded-[24px] p-5 shadow-md flex items-center justify-between group active:scale-[0.98] transition-all hover:bg-white/95"
+        >
+          <div class="flex items-center gap-4">
+            <div class="w-14 h-14 rounded-[16px] bg-[#D8D1FD] flex items-center justify-center text-black">
+              <Table size={28} strokeWidth={1.75} />
+            </div>
+            <div class="flex flex-col text-left">
+              <span class="font-body-500 text-[18px] text-black font-semibold">Download Excel</span>
+              <span class="font-caption text-black/50 text-[13px]">5 styled sheets with formulas & filters</span>
+            </div>
+          </div>
+          <span class="text-black/40 group-hover:text-black transition-colors font-bold text-lg">→</span>
+        </a>
+      </div>
+
+      <p class="font-caption text-black/50 text-[12px] text-center mt-4">
+        All exports include complete category totals, savings goal ledgers, and INR formatting.
+      </p>
+    </section>
+  </div>
+
+  <BottomNav currentPath="/export" />
+</AppShell>

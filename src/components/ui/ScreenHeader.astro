@@ -1,0 +1,241 @@
+---
+import { ArrowLeft, MoreVertical, Calendar, Bell, Mic, X } from 'lucide-react';
+
+interface Props {
+  title: string;
+  backHref?: string;
+  showBack?: boolean;
+  rightAction?: 'calendar' | 'more' | 'bell' | 'mic' | 'none';
+  rightHref?: string;
+  textColor?: string;
+  class?: string;
+}
+
+const {
+  title,
+  backHref = '/',
+  showBack = true,
+  rightAction = 'none',
+  rightHref,
+  textColor = 'text-white',
+  class: className = ''
+} = Astro.props;
+---
+
+<header class={`w-full h-16 px-5 pt-2 flex items-center justify-between relative z-10 select-none ${className}`}>
+  <div class="w-10 flex items-center justify-start">
+    {showBack ? (
+      <a
+        href={backHref}
+        class={`w-10 h-10 flex items-center justify-center -ml-2 rounded-full active:scale-95 transition-transform ${textColor}`}
+        aria-label="Go back"
+      >
+        <ArrowLeft size={22} strokeWidth={1.75} />
+      </a>
+    ) : (
+      <div class="w-10 h-10" />
+    )}
+  </div>
+
+  <h1 class={`font-title text-[18px] font-medium ${textColor} text-center flex-1 truncate px-2`}>
+    {title}
+  </h1>
+
+  <div class="w-10 flex items-center justify-end">
+    {rightAction === 'calendar' && (
+      <button
+        id="global-calendar-header-btn"
+        type="button"
+        class={`w-10 h-10 flex items-center justify-center -mr-2 rounded-full active:scale-95 transition-transform cursor-pointer hover:bg-white/10 ${textColor}`}
+        aria-label="Filter by date or month"
+        onclick="window.__openCalendarModal && window.__openCalendarModal()"
+      >
+        <Calendar size={22} strokeWidth={1.75} />
+      </button>
+    )}
+    {rightAction === 'more' && (
+      <button type="button" class={`w-10 h-10 flex items-center justify-center -mr-2 rounded-full active:scale-95 transition-transform ${textColor}`} aria-label="More options">
+        <MoreVertical size={22} strokeWidth={1.75} />
+      </button>
+    )}
+    {rightAction === 'bell' && (
+      <a href={rightHref || '/notifications'} class={`w-10 h-10 flex items-center justify-center -mr-2 rounded-full active:scale-95 transition-transform ${textColor}`} aria-label="Notifications">
+        <Bell size={22} strokeWidth={1.75} />
+      </a>
+    )}
+    {rightAction === 'mic' && (
+      <a href="/add?voice=1" class={`w-10 h-10 flex items-center justify-center -mr-2 rounded-full active:scale-95 transition-transform ${textColor}`} aria-label="Voice input">
+        <Mic size={22} strokeWidth={1.75} />
+      </a>
+    )}
+    {rightAction === 'none' && <div class="w-10 h-10" />}
+  </div>
+</header>
+
+<!-- Interactive Calendar Filter Modal -->
+{rightAction === 'calendar' && (
+  <div
+    id="calendar-modal"
+    class="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-md hidden items-center justify-center p-4 select-none"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div
+      class="w-full max-w-[390px] bg-[#1A1A1D] text-white rounded-[28px] p-5 sm:p-6 border border-white/15 shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-150"
+      onclick="event.stopPropagation()"
+    >
+      <div class="flex items-center justify-between border-b border-white/10 pb-3 gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-9 h-9 shrink-0 rounded-full bg-[#B8ACFA]/20 flex items-center justify-center text-[#B8ACFA]">
+            <Calendar size={18} strokeWidth={2} />
+          </div>
+          <div>
+            <h3 class="text-[16px] sm:text-[17px] font-semibold tracking-tight text-white whitespace-nowrap leading-tight">
+              Select Timeframe
+            </h3>
+            <p class="text-[12px] text-white/50" id="calendar-selection-label">Currently: This Week</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="w-8 h-8 shrink-0 rounded-full bg-white/10 hover:bg-white/20 active:scale-90 flex items-center justify-center text-white/80 hover:text-white transition-all cursor-pointer"
+          aria-label="Close modal"
+          onclick="window.__closeCalendarModal && window.__closeCalendarModal()"
+        >
+          <X size={17} strokeWidth={2.5} />
+        </button>
+      </div>
+
+      <!-- Quick preset selection pills -->
+      <div class="flex flex-col gap-2">
+        <span class="text-[11px] uppercase tracking-wider font-semibold text-white/40 px-1">Quick Presets</span>
+        <div class="grid grid-cols-2 gap-2">
+          {['This Week', 'October 2026', 'September 2026', 'All Time'].map((preset, idx) => (
+            <button
+              type="button"
+              data-filter={preset}
+              class={`calendar-filter-option h-11 rounded-[14px] text-[13px] font-semibold active:scale-95 transition-all text-center flex items-center justify-center cursor-pointer ${
+                idx === 0
+                  ? 'bg-[#B8ACFA] text-black shadow-sm'
+                  : 'bg-white/10 hover:bg-white/15 text-white font-medium'
+              }`}
+            >
+              {preset}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <!-- Month Picker -->
+      <div class="flex flex-col gap-2 pt-2 border-t border-white/10">
+        <span class="text-[11px] uppercase tracking-wider font-semibold text-white/40 px-1">2026 Months</span>
+        <div class="grid grid-cols-4 gap-2">
+          {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m) => (
+            <button
+              type="button"
+              data-filter={`${m} 2026`}
+              class={`calendar-filter-option h-9 rounded-[12px] text-[12px] font-medium transition-all cursor-pointer flex items-center justify-center ${
+                m === 'Oct'
+                  ? 'bg-[#8E7DF0] text-white font-semibold'
+                  : 'bg-white/5 hover:bg-white/15 text-white/70'
+              }`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 pt-2 border-t border-white/10">
+        <button
+          type="button"
+          class="flex-1 h-12 bg-white/10 hover:bg-white/15 text-white font-medium text-[14px] rounded-[16px] active:scale-[0.98] transition-all cursor-pointer"
+          onclick="window.__closeCalendarModal && window.__closeCalendarModal()"
+        >
+          Cancel
+        </button>
+        <button
+          id="apply-calendar-filter-btn"
+          type="button"
+          class="flex-1 h-12 bg-[#B8ACFA] hover:bg-[#a89af7] text-black font-semibold text-[14px] rounded-[16px] active:scale-[0.98] transition-all cursor-pointer shadow-md"
+        >
+          Apply
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+<script is:inline>
+  window.__openCalendarModal = function() {
+    const modal = document.getElementById('calendar-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+  };
+
+  window.__closeCalendarModal = function() {
+    const modal = document.getElementById('calendar-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+  };
+
+  (function setupCalendarEvents() {
+    let selectedTimeframe = 'This Week';
+
+    document.addEventListener('click', function(e) {
+      const target = e.target;
+      if (!target) return;
+
+      if (target.closest && target.closest('#global-calendar-header-btn')) {
+        e.preventDefault();
+        window.__openCalendarModal();
+        return;
+      }
+
+      const modal = document.getElementById('calendar-modal');
+      if (modal && target === modal) {
+        window.__closeCalendarModal();
+        return;
+      }
+
+      const optionBtn = target.closest ? target.closest('.calendar-filter-option') : null;
+      if (optionBtn) {
+        const val = optionBtn.getAttribute('data-filter');
+        if (val) {
+          selectedTimeframe = val;
+          const allOptions = document.querySelectorAll('.calendar-filter-option');
+          allOptions.forEach(opt => {
+            opt.classList.remove('bg-[#B8ACFA]', 'text-black', 'font-semibold', 'bg-[#8E7DF0]');
+            opt.classList.add('bg-white/10', 'text-white');
+          });
+          optionBtn.classList.remove('bg-white/10', 'bg-white/5', 'text-white', 'text-white/70');
+          optionBtn.classList.add('bg-[#B8ACFA]', 'text-black', 'font-semibold');
+
+          const label = document.getElementById('calendar-selection-label');
+          if (label) {
+            label.textContent = 'Selected: ' + selectedTimeframe;
+          }
+        }
+        return;
+      }
+
+      if (target.closest && target.closest('#apply-calendar-filter-btn')) {
+        window.__closeCalendarModal();
+        window.dispatchEvent(new CustomEvent('timeframe-filter-changed', {
+          detail: { timeframe: selectedTimeframe }
+        }));
+      }
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        window.__closeCalendarModal();
+      }
+    });
+  })();
+</script>
+

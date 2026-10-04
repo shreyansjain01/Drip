@@ -1,0 +1,8 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+import AddExpenseForm from '../components/expenses/AddExpenseForm';
+---
+
+<AppShell title="Add Expense — Drip" hideNav={true}>
+  <AddExpenseForm client:load />
+</AppShell>

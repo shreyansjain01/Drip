@@ -1,0 +1,26 @@
+---
+import AppShell from '../../layouts/AppShell.astro';
+---
+
+<AppShell title="Authenticating... — Drip" hideNav={true}>
+  <div class="w-full h-full bg-black flex flex-col items-center justify-center text-white p-6">
+    <div class="w-12 h-12 border-4 border-[#B8ACFA]/30 border-t-[#B8ACFA] rounded-full animate-spin mb-4"></div>
+    <p class="font-display text-[18px]">Signing you in to Drip...</p>
+  </div>
+</AppShell>
+
+<script>
+  import { supabase } from '../../lib/supabase/client';
+
+  // Listen for auth state change or process hash
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      window.location.href = '/onboarding';
+    }
+  });
+
+  // Fallback timeout
+  setTimeout(() => {
+    window.location.href = '/onboarding';
+  }, 1500);
+</script>

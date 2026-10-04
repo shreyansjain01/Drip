@@ -1,0 +1,90 @@
+---
+import { Bell } from 'lucide-react';
+
+interface Props {
+  name?: string;
+  avatarUrl?: string;
+  hasUnreadNotifications?: boolean;
+}
+
+const {
+  name = 'Ellie-May',
+  avatarUrl,
+  hasUnreadNotifications = true
+} = Astro.props;
+---
+
+<header class="w-full h-18 px-5 pt-2 flex items-center justify-between bg-black text-white relative z-10 select-none">
+  <div class="flex items-center gap-3">
+    <!-- 40px rounded avatar tile (radius 10) -->
+    <div id="greeting-avatar-container" class="w-10 h-10 rounded-[10px] bg-[#1A1A1D] overflow-hidden flex items-center justify-center border border-white/10 shrink-0">
+      {avatarUrl ? (
+        <img id="greeting-avatar-img" src={avatarUrl} alt={name} class="w-full h-full object-cover" />
+      ) : (
+        <div id="greeting-avatar-initial" class="w-full h-full bg-gradient-to-br from-[#B8ACFA] to-[#8E7DF0] flex items-center justify-center text-black font-semibold text-sm">
+          {name.charAt(0)}
+        </div>
+      )}
+    </div>
+
+    <!-- Greeting text with clear typography -->
+    <div class="flex flex-col text-left">
+      <span id="greeting-name" class="font-greeting text-[18px] leading-tight text-white font-medium">Hi, {name}</span>
+      <span class="font-caption text-white/60 text-[13px] mt-0.5">Your wallet</span>
+    </div>
+  </div>
+
+  <!-- Notification Bell with lavender unread indicator dot -->
+  <a
+    href="/notifications"
+    class="w-10 h-10 flex items-center justify-center rounded-full relative text-white/90 active:scale-95 transition-transform"
+    aria-label="View notifications"
+  >
+    <Bell size={22} strokeWidth={1.75} />
+    {hasUnreadNotifications && (
+      <span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#B8ACFA] ring-2 ring-black"></span>
+    )}
+  </a>
+</header>
+
+<script>
+  import { supabase } from '../../lib/supabase/client';
+
+  async function updateGreeting() {
+    const greetingNameEl = document.getElementById('greeting-name');
+    const avatarInitialEl = document.getElementById('greeting-avatar-initial');
+    const avatarImgEl = document.getElementById('greeting-avatar-img') as HTMLImageElement;
+    const avatarContainer = document.getElementById('greeting-avatar-container');
+
+    // 1. Check localStorage first
+    const localName = localStorage.getItem('drip_user_name');
+    if (localName && greetingNameEl) {
+      greetingNameEl.textContent = `Hi, ${localName}`;
+      if (avatarInitialEl) avatarInitialEl.textContent = localName.charAt(0).toUpperCase();
+    }
+
+    // 2. Check Supabase session
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const detectedName = user.user_metadata?.full_name 
+          || user.user_metadata?.name 
+          || user.email?.split('@')[0];
+        
+        if (detectedName) {
+          if (greetingNameEl) greetingNameEl.textContent = `Hi, ${detectedName}`;
+          if (avatarInitialEl) avatarInitialEl.textContent = detectedName.charAt(0).toUpperCase();
+          localStorage.setItem('drip_user_name', detectedName);
+        }
+
+        const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture;
+        if (avatarUrl && avatarContainer) {
+          avatarContainer.innerHTML = `<img src="${avatarUrl}" alt="${detectedName || 'User'}" class="w-full h-full object-cover" />`;
+        }
+      }
+    } catch {}
+  }
+
+  updateGreeting();
+  document.addEventListener('astro:page-load', updateGreeting);
+</script>

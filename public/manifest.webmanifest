@@ -1,0 +1,40 @@
+{
+  "name": "Drip — Expense Tracker",
+  "short_name": "Drip",
+  "description": "Liquid aesthetic, habit-aware expense tracker",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add expense",
+      "short_name": "Add",
+      "description": "Quickly add an expense manually",
+      "url": "/add",
+      "icons": [{ "src": "/favicon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Voice add",
+      "short_name": "Voice",
+      "description": "Log an expense by voice",
+      "url": "/add?voice=1",
+      "icons": [{ "src": "/favicon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Add to goal",
+      "short_name": "Goal",
+      "description": "Contribute to savings goal",
+      "url": "/goals",
+      "icons": [{ "src": "/favicon.svg", "sizes": "192x192" }]
+    }
+  ]
+}

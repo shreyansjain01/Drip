@@ -1,0 +1,11 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+import Drip from '../components/ui/Drip.astro';
+import OnboardingFlow from '../components/onboarding/OnboardingFlow';
+---
+
+<AppShell title="Welcome to Drip" hideNav={true}>
+  <div class="w-full h-full bg-black flex flex-col justify-between overflow-hidden">
+    <OnboardingFlow client:load />
+  </div>
+</AppShell>

@@ -1,0 +1,80 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+import ScreenHeader from '../components/ui/ScreenHeader.astro';
+import Drip from '../components/ui/Drip.astro';
+import BottomNav from '../components/ui/BottomNav.astro';
+import { Bell, Sparkles, Mic, CheckCircle2 } from 'lucide-react';
+
+const notifications = [
+  {
+    id: 'n-1',
+    title: 'Welcome to Drip! 🎉',
+    body: "Your liquid expense tracker is ready. Tap the mic button anytime to log expenses using natural voice.",
+    time: 'Just now',
+    unread: true,
+    isSpecial: true,
+    actionUrl: '/add?voice=1'
+  }
+];
+---
+
+<AppShell title="Notifications — Drip">
+  <div class="w-full flex-1 flex flex-col bg-black text-white relative select-none pb-28">
+    <ScreenHeader title="Notifications" showBack={true} rightAction="more" textColor="text-white" />
+
+    <!-- Drip into Lavender surface -->
+    <Drip variant="top" fill="var(--lavender-500)" seed="home" />
+
+    <section class="flex-1 bg-[#B8ACFA] text-black px-5 pt-3 pb-8 flex flex-col gap-4 min-h-[500px]">
+      <div class="flex justify-between items-center text-black/60 text-[12px] font-medium border-b border-black/10 pb-2">
+        <span>Recent Notifications</span>
+        <button type="button" class="hover:text-black">Mark all as read</button>
+      </div>
+
+      <div class="flex flex-col gap-3">
+        {notifications.map((n) => (
+          <div class={`w-full rounded-[20px] p-4 flex flex-col gap-2 shadow-sm border transition-all ${
+            n.isSpecial ? 'bg-black text-white border-white/20' : 'bg-white text-black border-black/5'
+          }`}>
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-2.5">
+                {n.isSpecial ? (
+                  <div class="w-8 h-8 rounded-full bg-[#B8ACFA] flex items-center justify-center text-black">
+                    <Sparkles size={16} />
+                  </div>
+                ) : (
+                  <div class="w-8 h-8 rounded-full bg-[#B8ACFA]/30 flex items-center justify-center text-black">
+                    <Bell size={16} />
+                  </div>
+                )}
+                <span class={`font-body-500 text-[15px] ${n.isSpecial ? 'text-white' : 'text-black'}`}>
+                  {n.title}
+                </span>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <span class={`text-[11px] ${n.isSpecial ? 'text-white/50' : 'text-black/40'}`}>{n.time}</span>
+                {n.unread && <span class="w-2 h-2 rounded-full bg-[#B8ACFA]" />}
+              </div>
+            </div>
+
+            <p class={`text-[13px] leading-relaxed ${n.isSpecial ? 'text-white/80' : 'text-black/70'}`}>
+              {n.body}
+            </p>
+
+            {n.actionUrl && (
+              <a
+                href={n.actionUrl}
+                class="mt-1 inline-flex items-center gap-1.5 text-[12px] font-semibold text-black bg-[#B8ACFA] px-3 py-1.5 rounded-full w-fit active:scale-95 transition-transform"
+              >
+                <Mic size={14} /> Quick Log by Voice
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  </div>
+
+  <BottomNav currentPath="/notifications" />
+</AppShell>

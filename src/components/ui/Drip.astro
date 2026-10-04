@@ -1,0 +1,55 @@
+---
+import { getDripData } from '../../lib/drip';
+
+interface Props {
+  variant?: 'top' | 'bottom';
+  fill: string;
+  seed?: number | string;
+  height?: number;
+  width?: number;
+  cutoutFill?: string;
+  class?: string;
+  id?: string;
+}
+
+const {
+  variant = 'top',
+  fill,
+  seed = 'home',
+  height = 70,
+  width = 430,
+  cutoutFill = 'var(--ink-900)',
+  class: className = '',
+  id
+} = Astro.props;
+
+const { path, cutouts } = getDripData(seed, width, height);
+const isBottom = variant === 'bottom';
+---
+
+<div
+  class={`relative w-full overflow-hidden pointer-events-none select-none ${className}`}
+  style={`height: ${height}px; margin-top: ${isBottom ? '-1px' : '0'}; margin-bottom: ${isBottom ? '0' : '-1px'};`}
+  id={id}
+>
+  <svg
+    viewBox={`0 0 ${width} ${height}`}
+    preserveAspectRatio="none"
+    class={`w-full h-full block ${isBottom ? 'rotate-180 scale-x-[-1]' : ''}`}
+    style={`fill: ${fill};`}
+    aria-hidden="true"
+  >
+    <path d={path} />
+    {cutouts && cutouts.length > 0 && cutouts.map(cutout => (
+      <rect
+        x={cutout.x}
+        y={cutout.y}
+        width={cutout.w}
+        height={cutout.h}
+        rx={cutout.r}
+        ry={cutout.r}
+        style={`fill: ${cutoutFill};`}
+      />
+    ))}
+  </svg>
+</div>

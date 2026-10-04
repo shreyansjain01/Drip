@@ -1,0 +1,91 @@
+---
+import AppShell from '../../layouts/AppShell.astro';
+import ScreenHeader from '../../components/ui/ScreenHeader.astro';
+import Drip from '../../components/ui/Drip.astro';
+import AmountDisplay from '../../components/ui/AmountDisplay';
+import { formatINR } from '../../lib/money';
+import { Plus, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+
+const { id } = Astro.params;
+
+const goalDetail = {
+  id: id || 'goal-1',
+  name: 'Emergency Fund',
+  savedPaise: 8500000,
+  targetPaise: 10000000,
+  contributions: [
+    { id: 'c-1', amountPaise: 2000000, date: 'Oct 1, 2026', note: 'Monthly Salary Allocation', isDeposit: true },
+    { id: 'c-2', amountPaise: 500000, date: 'Sep 25, 2026', note: 'Freelance Bonus', isDeposit: true },
+    { id: 'c-3', amountPaise: 1000000, date: 'Sep 1, 2026', note: 'Monthly Salary Allocation', isDeposit: true },
+    { id: 'c-4', amountPaise: -300000, date: 'Aug 15, 2026', note: 'Car repair withdrawal', isDeposit: false }
+  ]
+};
+---
+
+<AppShell title={`${goalDetail.name} — Drip`}>
+  <div class="w-full flex-1 flex flex-col bg-black text-white relative select-none pb-28">
+    <!-- Top Lavender Surface -->
+    <div class="w-full bg-[#B8ACFA] text-black pt-2 pb-6 flex flex-col">
+      <ScreenHeader title={goalDetail.name} showBack={true} backHref="/goals" rightAction="more" textColor="text-black" />
+
+      <div class="flex flex-col items-center mt-2 px-5 text-center">
+        <AmountDisplay client:load value={(goalDetail.savedPaise / 100).toString()} showCaret={false} />
+        <span class="font-caption text-black/60 font-medium mt-1">
+          of {formatINR(goalDetail.targetPaise)} target ({Math.round((goalDetail.savedPaise / goalDetail.targetPaise) * 100)}% saved)
+        </span>
+      </div>
+    </div>
+
+    <!-- Drip bottom edge into Black bottom -->
+    <Drip variant="bottom" fill="var(--lavender-500)" seed="goals" cutoutFill="var(--ink-900)" />
+
+    <!-- Black Bottom Section with Contribution Ledger -->
+    <section class="flex-1 bg-black text-white px-5 pt-4 pb-8 flex flex-col justify-between min-h-[400px]">
+      <div class="flex flex-col gap-3">
+        <div class="flex justify-between items-center mb-1">
+          <h2 class="font-section text-white font-semibold">Contribution Ledger</h2>
+          <span class="text-[12px] text-white/50">{goalDetail.contributions.length} entries</span>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          {goalDetail.contributions.map((c) => (
+            <div class="flex items-center justify-between p-3 rounded-[16px] bg-[#0B0B0C] border border-white/10">
+              <div class="flex items-center gap-3">
+                <div class={`w-9 h-9 rounded-full flex items-center justify-center ${c.isDeposit ? 'bg-[#B8ACFA]/20 text-[#B8ACFA]' : 'bg-white/10 text-white'}`}>
+                  {c.isDeposit ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
+                </div>
+                <div class="flex flex-col">
+                  <span class="font-body-500 text-white text-[14px] leading-tight">{c.note}</span>
+                  <span class="font-caption text-white/40 text-[11px] mt-0.5">{c.date}</span>
+                </div>
+              </div>
+
+              <span class={`font-body-500 text-[15px] tabular-nums ${c.isDeposit ? 'text-[#B8ACFA]' : 'text-white/60'}`}>
+                {c.isDeposit ? '+' : ''}{formatINR(c.amountPaise)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex gap-3 mt-6">
+        <button
+          type="button"
+          onclick="alert('Add Money: Opens keypad sheet or contribution prompt')"
+          class="flex-1 h-14 rounded-[20px] bg-[#B8ACFA] text-black font-body-500 text-[16px] flex items-center justify-center gap-2 pressable shadow-lg active:scale-[0.98]"
+        >
+          <Plus size={20} strokeWidth={2} />
+          Add Money
+        </button>
+        <button
+          type="button"
+          onclick="alert('Withdraw from goal: Opens withdrawal sheet')"
+          class="px-5 h-14 rounded-[20px] bg-[#1A1A1D] text-white/80 font-body-500 text-[15px] flex items-center justify-center pressable active:scale-[0.98]"
+        >
+          Withdraw
+        </button>
+      </div>
+    </section>
+  </div>
+</AppShell>

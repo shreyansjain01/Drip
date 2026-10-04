@@ -1,0 +1,175 @@
+---
+import AppShell from '../../layouts/AppShell.astro';
+import Drip from '../../components/ui/Drip.astro';
+import ScreenHeader from '../../components/ui/ScreenHeader.astro';
+import GreetingHeader from '../../components/ui/GreetingHeader.astro';
+import ActionRow from '../../components/ui/ActionRow.astro';
+import TransactionRow from '../../components/ui/TransactionRow.astro';
+import Keypad from '../../components/ui/Keypad';
+import AmountDisplay from '../../components/ui/AmountDisplay';
+import CategoryChips from '../../components/ui/CategoryChips';
+import ProgressBar from '../../components/ui/ProgressBar';
+import AllocationBar from '../../components/ui/AllocationBar';
+import BottomNav from '../../components/ui/BottomNav.astro';
+import BarChart from '../../components/charts/BarChart';
+import DonutChart from '../../components/charts/DonutChart';
+import LineChart from '../../components/charts/LineChart';
+import HeatmapChart from '../../components/charts/HeatmapChart';
+
+const demoCategories = [
+  { id: '1', name: 'Food', icon: 'Utensils' },
+  { id: '2', name: 'Transport', icon: 'Car' },
+  { id: '3', name: 'Shopping', icon: 'ShoppingBag' },
+  { id: '4', name: 'Bills', icon: 'Receipt' },
+  { id: '5', name: 'Coffee', icon: 'Coffee' }
+];
+
+const demoAllocation = [
+  { id: '1', name: 'Expenses', paise: 4500000, color: '#B8ACFA' },
+  { id: '2', name: 'Savings', paise: 2500000, color: '#D8D1FD' },
+  { id: '3', name: 'Emergency Fund', paise: 1500000, color: '#8E7DF0' }
+];
+---
+
+<AppShell title="Drip UI Kit — Storybook">
+  <div class="flex flex-col w-full pb-32">
+    <!-- Top Bar -->
+    <div class="bg-black p-4 text-center border-b border-white/10">
+      <h2 class="text-xs uppercase tracking-widest text-[#B8ACFA] font-bold">Drip Design System Showcase</h2>
+    </div>
+
+    <!-- 1. Greeting Header -->
+    <section class="border-b border-white/10 bg-black">
+      <GreetingHeader name="Ellie-May" hasUnreadNotifications={true} />
+    </section>
+
+    <!-- 2. Drip Top Edge into Lavender Surface -->
+    <Drip variant="top" fill="var(--lavender-500)" seed="home" />
+
+    <!-- 3. Lavender Surface with Balance, ActionRow & Transactions -->
+    <section class="bg-[#B8ACFA] text-black px-5 py-4 flex flex-col gap-5">
+      <!-- Balance Display matching Reference Screen 1 -->
+      <div class="flex flex-col pt-2">
+        <AmountDisplay client:load value="3200" showCaret={false} />
+        <div class="w-full h-[1px] bg-black/15 my-3"></div>
+        <div class="flex justify-between items-center text-[11px] font-medium text-black/60 tracking-wider">
+          <span>08/2028<br />4466 98** **** 8841</span>
+          <span class="font-bold text-black tracking-widest text-xs">VISA</span>
+        </div>
+      </div>
+
+      <!-- Action Row -->
+      <ActionRow />
+
+      <!-- Transactions Section -->
+      <div class="flex flex-col gap-1 mt-2">
+        <h3 class="font-section text-black mb-1">Transactions</h3>
+        <TransactionRow
+          id="1"
+          title="Netflix"
+          category="Subscription"
+          iconName="Film"
+          amountPaise={1099}
+        />
+        <TransactionRow
+          id="2"
+          title="Amazon"
+          category="Shopping"
+          iconName="ShoppingBag"
+          amountPaise={9299}
+        />
+        <TransactionRow
+          id="3"
+          title="Starbucks"
+          category="Food & Drinks"
+          iconName="Coffee"
+          amountPaise={329}
+        />
+        <TransactionRow
+          id="4"
+          title="Uber"
+          category="Transport"
+          iconName="Car"
+          amountPaise={1699}
+        />
+      </div>
+
+      <!-- Allocation Bar Demo -->
+      <div class="flex flex-col gap-2 mt-4">
+        <h3 class="font-title text-black">Monthly Plan Allocation</h3>
+        <AllocationBar client:load segments={demoAllocation} totalPaise={10000000} onLavenderSurface={true} />
+      </div>
+    </section>
+
+    <!-- 4. Drip Bottom Edge into Black Surface -->
+    <Drip variant="bottom" fill="var(--lavender-500)" seed="add" cutoutFill="var(--ink-900)" />
+
+    <!-- 5. Black Surface with CategoryChips, Keypad, and ScreenHeader -->
+    <section class="bg-black text-white px-5 py-6 flex flex-col gap-6">
+      <ScreenHeader title="Transfer money" showBack={true} rightAction="more" textColor="text-white" />
+      
+      <!-- Keypad Screen Amount -->
+      <div class="py-2 bg-[#B8ACFA] rounded-2xl">
+        <AmountDisplay client:load value="160" showCaret={true} />
+      </div>
+
+      <!-- Category Chips -->
+      <div>
+        <span class="text-xs text-white/50 px-1 mb-2 block uppercase tracking-wider">Categories</span>
+        <CategoryChips client:load categories={demoCategories} selectedId="1" onSelect={() => {}} onAddNew={() => {}} />
+      </div>
+
+      <!-- Keypad -->
+      <Keypad client:load onKeyPress={() => {}} onBackspace={() => {}} />
+
+      <!-- Primary Button -->
+      <button class="w-full h-14 rounded-[20px] bg-[#B8ACFA] text-black font-title flex items-center justify-center pressable active:scale-[0.98] transition-transform">
+        Send money
+      </button>
+    </section>
+
+    <!-- 6. Analytics Section (BarChart on Black -> Drip -> Cream Sheet) -->
+    <section class="bg-black text-white px-5 pt-6 flex flex-col gap-4">
+      <ScreenHeader title="Analytics" showBack={true} rightAction="calendar" textColor="text-white" />
+      
+      <!-- Custom SVG Bar Chart -->
+      <BarChart client:load />
+    </section>
+
+    <!-- Drip into Cream Sheet -->
+    <Drip variant="top" fill="var(--cream-100)" seed="analytics" cutoutFill="var(--ink-900)" />
+
+    <!-- Cream Sheet with Savings Goals and Breakdown Charts -->
+    <section class="bg-[#FBF8EC] text-black px-5 py-6 flex flex-col gap-6">
+      <h3 class="font-section text-black">Savings Goals</h3>
+      
+      <div class="flex flex-col gap-4">
+        <ProgressBar client:load label="Emergency" percent={85} />
+        <ProgressBar client:load label="Travel" percent={70} />
+        <ProgressBar client:load label="Home renovation" percent={65} />
+        <ProgressBar client:load label="Healthcare" percent={37} />
+      </div>
+
+      <!-- Donut Breakdown -->
+      <div class="mt-6">
+        <h3 class="font-section text-black mb-4">Where It Went</h3>
+        <DonutChart client:load />
+      </div>
+
+      <!-- Trend Line -->
+      <div class="mt-6">
+        <h3 class="font-section text-black mb-2">Daily Spending Trend</h3>
+        <LineChart client:load />
+      </div>
+
+      <!-- Heatmap -->
+      <div class="mt-6">
+        <h3 class="font-section text-black mb-3">When You Spend</h3>
+        <HeatmapChart client:load />
+      </div>
+    </section>
+  </div>
+
+  <!-- Floating BottomNav -->
+  <BottomNav currentPath="/dev/ui" />
+</AppShell>

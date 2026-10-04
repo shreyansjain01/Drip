@@ -1,0 +1,58 @@
+---
+import { Download, ArrowUpRight, Plus, Grid } from 'lucide-react';
+
+interface Props {
+  class?: string;
+}
+
+const { class: className = '' } = Astro.props;
+---
+
+<div class={`w-full flex items-center gap-3 select-none ${className}`}>
+  <!-- 1: Income / Receive (Download icon) -->
+  <a
+    href="/income"
+    class="w-14 h-14 rounded-[14px] bg-white flex items-center justify-center text-black shrink-0 pressable shadow-sm active:bg-[#D8D1FD]"
+    aria-label="Add Income"
+  >
+    <Download size={22} strokeWidth={1.75} />
+  </a>
+
+  <!-- 2: Analytics / Transfer (Arrow up right icon) -->
+  <a
+    href="/analytics"
+    class="w-14 h-14 rounded-[14px] bg-white flex items-center justify-center text-black shrink-0 pressable shadow-sm active:bg-[#D8D1FD]"
+    aria-label="View Analytics"
+  >
+    <ArrowUpRight size={22} strokeWidth={1.75} />
+  </a>
+
+  <!-- 3: Add Expense (Plus icon) -->
+  <a
+    href="/add"
+    class="w-14 h-14 rounded-[14px] bg-white flex items-center justify-center text-black shrink-0 pressable shadow-sm active:bg-[#D8D1FD]"
+    aria-label="Add Expense"
+  >
+    <Plus size={22} strokeWidth={1.75} />
+  </a>
+
+  <!-- 4: More menu (Wide black tile with 3x3 grid dots) -->
+  <a
+    href="/settings"
+    class="flex-1 h-14 rounded-[14px] bg-black flex items-center justify-center text-white pressable active:bg-[#1A1A1D]"
+    aria-label="More Options & Settings"
+  >
+    <!-- Custom 3x3 grid dots (3px each) -->
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" class="text-white fill-current">
+      <circle cx="3" cy="3" r="1.5" />
+      <circle cx="9" cy="3" r="1.5" />
+      <circle cx="15" cy="3" r="1.5" />
+      <circle cx="3" cy="9" r="1.5" />
+      <circle cx="9" cy="9" r="1.5" />
+      <circle cx="15" cy="9" r="1.5" />
+      <circle cx="3" cy="15" r="1.5" />
+      <circle cx="9" cy="15" r="1.5" />
+      <circle cx="15" cy="15" r="1.5" />
+    </svg>
+  </a>
+</div>

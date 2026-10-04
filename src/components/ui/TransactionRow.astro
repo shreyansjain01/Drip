@@ -1,0 +1,59 @@
+---
+import { formatINR } from '../../lib/money';
+import * as Icons from 'lucide-react';
+
+interface Props {
+  id: string;
+  title: string;
+  category: string;
+  iconName?: string;
+  amountPaise: number | bigint;
+  date?: string;
+  isIncome?: boolean;
+  class?: string;
+}
+
+const {
+  id,
+  title,
+  category,
+  iconName = 'ShoppingBag',
+  amountPaise,
+  date,
+  isIncome = false,
+  class: className = ''
+} = Astro.props;
+
+// Dynamic icon resolution or fallback
+// @ts-ignore
+const LucideIcon = Icons[iconName] || Icons.ShoppingBag;
+const formattedAmount = formatINR(amountPaise);
+const sign = isIncome ? '+' : '-';
+---
+
+<a
+  href={`/expenses/${id}`}
+  class={`w-full flex items-center justify-between py-3 group select-none relative transition-colors active:bg-black/5 rounded-xl px-2 -mx-2 ${className}`}
+>
+  <div class="flex items-center gap-3.5 min-w-0">
+    <!-- 44px icon tile (white at 40% on lavender) -->
+    <div class="w-11 h-11 rounded-[14px] bg-white/40 flex items-center justify-center text-black shrink-0 border border-black/5">
+      <LucideIcon size={20} strokeWidth={1.75} />
+    </div>
+
+    <!-- Title & Category subtitle -->
+    <div class="flex flex-col text-left truncate">
+      <span class="font-body-500 text-black truncate leading-tight">{title}</span>
+      <span class="font-caption text-black/50 truncate mt-0.5">{category}</span>
+    </div>
+  </div>
+
+  <!-- Amount -->
+  <div class="text-right shrink-0 pl-2">
+    <span class="font-body-500 text-black tabular-nums">
+      {sign}{formattedAmount}
+    </span>
+    {date && <span class="block font-micro text-black/40 mt-0.5">{date}</span>}
+  </div>
+</a>
+<div class="w-full h-[1px] bg-black/10 my-0.5 last:hidden"></div>

@@ -1,0 +1,142 @@
+@import "tailwindcss";
+@import "@fontsource-variable/instrument-sans";
+
+:root {
+  /* Brand */
+  --lavender-500: #B8ACFA;   /* primary surface, buttons, chart highlight, progress fill */
+  --lavender-300: #D8D1FD;   /* soft fills, hover, tile backgrounds on black */
+  --lavender-700: #8E7DF0;   /* focus ring, pressed state */
+
+  /* Neutrals */
+  --ink-900: #000000;        /* app background / black surfaces */
+  --ink-800: #0B0B0C;        /* raised black (cards on black) */
+  --ink-700: #1A1A1D;        /* dividers on black, disabled */
+  --cream-100: #FBF8EC;      /* cream surface, bars, analytics sheet */
+  --white: #FFFFFF;          /* keys, action tiles, tooltips */
+  --stage: #E8E9EB;          /* page backdrop outside the app column (desktop) */
+
+  /* Text */
+  --text-on-lavender: #000000;
+  --text-on-lavender-muted: rgba(0, 0, 0, 0.50);
+  --text-on-black: #FFFFFF;
+  --text-on-black-muted: rgba(255, 255, 255, 0.55);
+  --text-on-cream: #000000;
+  --text-on-cream-muted: rgba(0, 0, 0, 0.50);
+
+  /* Semantic */
+  --warn: #FF7A6B;           /* over-budget dot / text on black only */
+  --ok: var(--lavender-500); /* success = lavender, never green */
+}
+
+@theme {
+  --color-lavender-300: #D8D1FD;
+  --color-lavender-500: #B8ACFA;
+  --color-lavender-700: #8E7DF0;
+  --color-ink-900: #000000;
+  --color-ink-800: #0B0B0C;
+  --color-ink-700: #1A1A1D;
+  --color-cream-100: #FBF8EC;
+  --color-stage: #E8E9EB;
+  --color-warn: #FF7A6B;
+
+  --font-sans: "Instrument Sans Variable", "Instrument Sans", "Hanken Grotesk", "Helvetica Neue", Arial, system-ui, sans-serif;
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 20px;
+  --radius-pill: 9999px;
+  --radius-device: 44px;
+
+  --ease-liquid: cubic-bezier(.2, .8, .2, 1);
+}
+
+html {
+  background: var(--color-stage);
+  color-scheme: dark light;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-stage);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom utility classes matching DESIGN.md */
+.font-display {
+  font-size: 56px;
+  line-height: 60px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.font-title {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.font-greeting {
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.font-section {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.font-body {
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 400;
+}
+
+.font-body-500 {
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 500;
+}
+
+.font-caption {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+}
+
+.font-micro {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.font-keypad {
+  font-size: 28px;
+  line-height: 32px;
+  font-weight: 400;
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid var(--lavender-700);
+  outline-offset: 2px;
+}
+
+/* Smooth active button feedback */
+.pressable {
+  transition: transform 90ms var(--ease-liquid), background-color 90ms ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.pressable:active {
+  transform: scale(0.96);
+}

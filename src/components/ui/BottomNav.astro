@@ -1,0 +1,75 @@
+---
+import { Home, BarChart2, Mic, Target, Settings } from 'lucide-react';
+
+interface Props {
+  currentPath?: string;
+}
+
+const { currentPath = '/' } = Astro.props;
+
+const isActive = (path: string) => {
+  if (path === '/' && currentPath === '/') return true;
+  if (path !== '/' && currentPath.startsWith(path)) return true;
+  return false;
+};
+---
+
+<nav
+  class="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[398px] h-16 bg-black rounded-[28px] shadow-2xl flex items-center justify-between px-3 z-40 select-none border border-white/10"
+  aria-label="Main Navigation"
+>
+  <!-- 1: Home -->
+  <a
+    href="/"
+    class={`relative flex items-center justify-center w-11 h-11 rounded-full transition-all ${
+      isActive('/') ? 'bg-[#B8ACFA] text-black shadow-sm' : 'text-white/60 hover:text-white'
+    }`}
+    aria-label="Home"
+  >
+    <Home size={20} strokeWidth={1.75} />
+  </a>
+
+  <!-- 2: Analytics -->
+  <a
+    href="/analytics"
+    class={`relative flex items-center justify-center w-11 h-11 rounded-full transition-all ${
+      isActive('/analytics') ? 'bg-[#B8ACFA] text-black shadow-sm' : 'text-white/60 hover:text-white'
+    }`}
+    aria-label="Analytics"
+  >
+    <BarChart2 size={20} strokeWidth={1.75} />
+  </a>
+
+  <!-- 3: Raised Mic FAB (64px circle, lavender, black mic icon, raised 12px with 6px black ring) -->
+  <div class="relative -top-3">
+    <a
+      href="/add?voice=1"
+      class="w-16 h-16 rounded-full bg-[#B8ACFA] ring-[6px] ring-black flex items-center justify-center text-black shadow-xl active:scale-95 transition-transform pressable"
+      aria-label="Voice Add Expense"
+    >
+      <Mic size={26} strokeWidth={2} />
+    </a>
+  </div>
+
+  <!-- 4: Goals / Plan -->
+  <a
+    href="/goals"
+    class={`relative flex items-center justify-center w-11 h-11 rounded-full transition-all ${
+      isActive('/goals') || isActive('/plan') ? 'bg-[#B8ACFA] text-black shadow-sm' : 'text-white/60 hover:text-white'
+    }`}
+    aria-label="Savings Goals"
+  >
+    <Target size={20} strokeWidth={1.75} />
+  </a>
+
+  <!-- 5: Settings -->
+  <a
+    href="/settings"
+    class={`relative flex items-center justify-center w-11 h-11 rounded-full transition-all ${
+      isActive('/settings') ? 'bg-[#B8ACFA] text-black shadow-sm' : 'text-white/60 hover:text-white'
+    }`}
+    aria-label="Settings"
+  >
+    <Settings size={20} strokeWidth={1.75} />
+  </a>
+</nav>

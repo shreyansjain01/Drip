@@ -1,0 +1,35 @@
+---
+import AppShell from '../../layouts/AppShell.astro';
+import ScreenHeader from '../../components/ui/ScreenHeader.astro';
+import Drip from '../../components/ui/Drip.astro';
+import AmountDisplay from '../../components/ui/AmountDisplay';
+import GoalsListView from '../../components/goals/GoalsListView';
+import BottomNav from '../../components/ui/BottomNav.astro';
+---
+
+<AppShell title="Goals — Drip">
+  <div class="w-full flex-1 flex flex-col bg-black text-white relative select-none pb-28">
+    <!-- Top Black Header -->
+    <ScreenHeader title="Goals" showBack={true} rightAction="more" textColor="text-white" />
+
+    <!-- Top Lavender Surface seamlessly flowing into Cream -->
+    <div class="w-full bg-[#B8ACFA] text-black">
+      <section class="px-5 pt-2 pb-3 flex flex-col items-center">
+        <span class="text-[12px] font-semibold uppercase tracking-wider text-black/50 mb-1">
+          Total Saved Across Goals
+        </span>
+        <AmountDisplay client:load value="0.00" showCaret={false} />
+      </section>
+
+      <!-- Drip on Lavender background filling with Cream -->
+      <Drip variant="top" fill="var(--cream-100)" seed="goals" cutoutFill="#000000" height={54} class="bg-[#B8ACFA]" />
+    </div>
+
+    <!-- Cream Sheet with Goals Content -->
+    <section class="flex-1 bg-[#FBF8EC] text-black px-5 pt-2 pb-8 flex flex-col min-h-[500px]">
+      <GoalsListView client:load />
+    </section>
+  </div>
+
+  <BottomNav currentPath="/goals" />
+</AppShell>

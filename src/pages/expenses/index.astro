@@ -1,0 +1,23 @@
+---
+import AppShell from '../../layouts/AppShell.astro';
+import ScreenHeader from '../../components/ui/ScreenHeader.astro';
+import Drip from '../../components/ui/Drip.astro';
+import ExpensesListView from '../../components/expenses/ExpensesListView';
+import BottomNav from '../../components/ui/BottomNav.astro';
+---
+
+<AppShell title="Expenses — Drip">
+  <div class="w-full flex-1 flex flex-col bg-black text-white relative select-none pb-28">
+    <ScreenHeader title="Expenses" showBack={true} rightAction="calendar" textColor="text-white" />
+
+    <!-- Drip into Lavender list -->
+    <Drip variant="top" fill="var(--lavender-500)" seed="home" />
+
+    <section class="flex-1 bg-[#B8ACFA] text-black px-5 pt-3 pb-8 flex flex-col gap-3 min-h-[500px]">
+      <ExpensesListView client:load />
+    </section>
+  </div>
+
+  <BottomNav currentPath="/expenses" />
+</AppShell>
+

@@ -1,0 +1,199 @@
+---
+import AppShell from '../layouts/AppShell.astro';
+import ScreenHeader from '../components/ui/ScreenHeader.astro';
+import Drip from '../components/ui/Drip.astro';
+import BottomNav from '../components/ui/BottomNav.astro';
+import { User, Bell, Key, Download, LogOut, Trash2, Smartphone, Shield, Sparkles } from 'lucide-react';
+
+const learnedSlots = [
+  { time: '09:00 AM', label: 'Breakfast', origin: 'learned', enabled: true },
+  { time: '01:30 PM', label: 'Lunch', origin: 'learned', enabled: true },
+  { time: '05:15 PM', label: 'Snacks', origin: 'learned', enabled: true },
+  { time: '08:45 PM', label: 'Dinner', origin: 'learned', enabled: true }
+];
+---
+
+<AppShell title="Settings — Drip">
+  <div class="w-full flex-1 flex flex-col bg-black text-white relative select-none pb-28">
+    <ScreenHeader title="Settings" showBack={true} rightAction="none" textColor="text-white" />
+
+    <!-- Drip into Cream Sheet -->
+    <Drip variant="top" fill="var(--cream-100)" seed="settings" cutoutFill="var(--ink-900)" />
+
+    <section class="flex-1 bg-[#FBF8EC] text-black px-5 pt-3 pb-8 flex flex-col gap-6 min-h-[500px]">
+      
+      <!-- 1. Profile Section -->
+      <div class="flex flex-col gap-2">
+        <span class="text-[12px] uppercase tracking-wider font-semibold text-black/50 px-1">Profile</span>
+        <div class="bg-white rounded-[20px] p-4 shadow-sm border border-black/5 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div id="settings-avatar-box" class="w-12 h-12 rounded-[14px] bg-[#B8ACFA] flex items-center justify-center text-black font-bold text-lg overflow-hidden">
+              <span id="settings-avatar-char">E</span>
+            </div>
+            <div class="flex flex-col">
+              <span id="settings-profile-name" class="font-body-500 text-[16px] text-black">Ellie-May</span>
+              <span id="settings-profile-salary" class="font-caption text-black/50 text-[12px]">Monthly Salary: ₹75,000.00</span>
+            </div>
+          </div>
+          <a href="/onboarding" class="text-[13px] font-medium text-black/60 hover:text-black">Edit</a>
+        </div>
+      </div>
+
+      <!-- 2. Learned Reminder Times -->
+      <div class="flex flex-col gap-2">
+        <div class="flex justify-between items-center px-1">
+          <span class="text-[12px] uppercase tracking-wider font-semibold text-black/50">Habit Reminder Slots</span>
+          <span class="text-[11px] text-[#8E7DF0] font-medium flex items-center gap-1">
+            <Sparkles size={12} /> Auto-Learned
+          </span>
+        </div>
+        <div class="bg-white rounded-[20px] p-4 shadow-sm border border-black/5 flex flex-col gap-2.5">
+          {learnedSlots.map((slot) => (
+            <div class="flex items-center justify-between py-1.5 border-b border-black/5 last:border-none">
+              <div class="flex items-center gap-2.5">
+                <span class="px-2.5 py-1 bg-[#B8ACFA] rounded-full text-[12px] font-semibold text-black">
+                  {slot.time}
+                </span>
+                <span class="font-body-500 text-[14px] text-black">{slot.label}</span>
+              </div>
+              <input type="checkbox" checked={slot.enabled} class="w-4 h-4 accent-[#8E7DF0] cursor-pointer" />
+            </div>
+          ))}
+          <p class="font-micro text-black/40 text-[11px] mt-1">
+            Slots recompute nightly from your spending patterns over the last 45 days.
+          </p>
+        </div>
+      </div>
+
+      <!-- 3. Quick-Add Siri & Shortcuts Token -->
+      <div class="flex flex-col gap-2">
+        <span class="text-[12px] uppercase tracking-wider font-semibold text-black/50 px-1">Quick-Add (Siri / Android)</span>
+        <div class="bg-white rounded-[20px] p-4 shadow-sm border border-black/5 flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <Key size={18} />
+              <span class="font-body-500 text-[15px] text-black">Personal API Token</span>
+            </div>
+            <button
+              type="button"
+              onclick="navigator.clipboard.writeText('drip_tok_live_49f8a2b37c1d8e0f92a4'); alert('Token copied to clipboard: drip_tok_live_49f8a2b37c1d8e0f92a4');"
+              class="px-3 py-1 bg-[#B8ACFA] rounded-full text-[12px] font-semibold text-black active:scale-95"
+            >
+              Copy Token
+            </button>
+          </div>
+
+          <div class="bg-[#FBF8EC] p-2.5 rounded-xl border border-black/5">
+            <code class="text-[11px] text-black/70 break-all select-all font-mono">
+              POST /api/quick-add -H "Authorization: Bearer &lt;token&gt;" -d '&#123;"text":"chai 20"&#125;'
+            </code>
+          </div>
+
+          <a
+            href="/api/shortcuts/android.json"
+            download="drip-shortcuts.json"
+            class="text-[12px] font-semibold text-[#8E7DF0] hover:underline flex items-center gap-1 mt-0.5"
+          >
+            <Smartphone size={14} /> Download Android HTTP Shortcuts Config
+          </a>
+        </div>
+      </div>
+
+      <!-- 4. Quick Actions -->
+      <div class="flex flex-col gap-2">
+        <span class="text-[12px] uppercase tracking-wider font-semibold text-black/50 px-1">Data & System</span>
+        <div class="bg-white rounded-[20px] overflow-hidden shadow-sm border border-black/5 flex flex-col">
+          <a href="/export" class="flex items-center justify-between p-4 border-b border-black/5 hover:bg-black/5 transition-colors">
+            <div class="flex items-center gap-3">
+              <Download size={18} />
+              <span class="font-body-500 text-[15px] text-black">Export to PDF & Excel</span>
+            </div>
+            <span class="text-black/40">→</span>
+          </a>
+
+          <button
+            id="settings-signout-btn"
+            type="button"
+            class="flex items-center justify-between p-4 border-b border-black/5 text-left hover:bg-black/5 transition-colors cursor-pointer"
+          >
+            <div class="flex items-center gap-3 text-black">
+              <LogOut size={18} />
+              <span class="font-body-500 text-[15px]">Sign Out</span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onclick="if(confirm('Warning: Deleting your account will remove all expenses, goals, and history permanently.')) { alert('Account marked for deletion.'); window.location.href='/login'; }"
+            class="flex items-center justify-between p-4 text-left hover:bg-red-50 transition-colors"
+          >
+            <div class="flex items-center gap-3 text-[#FF7A6B]">
+              <Trash2 size={18} />
+              <span class="font-body-500 text-[15px]">Delete Account</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+    </section>
+  </div>
+
+  <BottomNav currentPath="/settings" />
+</AppShell>
+
+<script>
+  import { supabase } from '../lib/supabase/client';
+
+  async function initSettings() {
+    const profileNameEl = document.getElementById('settings-profile-name');
+    const profileSalaryEl = document.getElementById('settings-profile-salary');
+    const avatarCharEl = document.getElementById('settings-avatar-char');
+    const avatarBoxEl = document.getElementById('settings-avatar-box');
+
+    const localName = localStorage.getItem('drip_user_name');
+    const localSalary = localStorage.getItem('drip_user_salary');
+
+    if (localName && profileNameEl) {
+      profileNameEl.textContent = localName;
+      if (avatarCharEl) avatarCharEl.textContent = localName.charAt(0).toUpperCase();
+    }
+    if (localSalary && profileSalaryEl) {
+      const num = parseInt(localSalary, 10);
+      profileSalaryEl.textContent = `Monthly Salary: ₹${num.toLocaleString('en-IN')}.00`;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const detectedName = user.user_metadata?.full_name 
+          || user.user_metadata?.name 
+          || user.email?.split('@')[0];
+        
+        if (detectedName && profileNameEl) {
+          profileNameEl.textContent = detectedName;
+          if (avatarCharEl) avatarCharEl.textContent = detectedName.charAt(0).toUpperCase();
+        }
+
+        const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture;
+        if (avatarUrl && avatarBoxEl) {
+          avatarBoxEl.innerHTML = `<img src="${avatarUrl}" alt="Avatar" class="w-full h-full object-cover" />`;
+        }
+      }
+    } catch {}
+  }
+
+  // Bind Sign Out
+  const signOutBtn = document.getElementById('settings-signout-btn');
+  signOutBtn?.addEventListener('click', async () => {
+    if (confirm('Are you sure you want to sign out?')) {
+      try {
+        await supabase.auth.signOut();
+        localStorage.removeItem('drip_user_name');
+      } catch {}
+      window.location.href = '/login';
+    }
+  });
+
+  initSettings();
+  document.addEventListener('astro:page-load', initSettings);
+</script>
