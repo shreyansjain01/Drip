@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Check, X } from 'lucide-react';
+import { Mic, Check, X, Sparkles } from 'lucide-react';
 import { parseVoiceInput, type ParsedVoiceResult } from '../../lib/voice/parse';
 import AmountDisplay from '../ui/AmountDisplay';
 import CategoryChips from '../ui/CategoryChips';
@@ -30,12 +30,15 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
   const [selectedCatId, setSelectedCatId] = useState('1');
   const [waveformLevels, setWaveformLevels] = useState<number[]>(Array(24).fill(6));
   const [isSaving, setIsSaving] = useState(false);
+  const [pwaRestrictedNotice, setPwaRestrictedNotice] = useState(false);
   
   const recognitionRef = useRef<any>(null);
   const isListeningRef = useRef<boolean>(false);
   const transcriptRef = useRef<string>('');
   const waveIntervalRef = useRef<any>(null);
   const silenceTimeoutRef = useRef<any>(null);
+  const startTimeRef = useRef<number>(0);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const cleanupAudio = () => {
     if (waveIntervalRef.current) {
@@ -58,6 +61,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       transcriptRef.current = '';
       setInputText('');
       setIsSaving(false);
+      setPwaRestrictedNotice(false);
     }
   }, [isOpen]);
 
@@ -73,13 +77,33 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
     }, 90);
   };
 
+  const handlePwaRestrictionFallback = () => {
+    setPwaRestrictedNotice(true);
+    setTranscript('');
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 150);
+  };
+
   // Synchronous start to ensure browser user-gesture token is preserved
   const startListening = () => {
+    const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent || '');
+    const isStandalone = typeof window !== 'undefined' && (
+      ('standalone' in (navigator as any) && (navigator as any).standalone) ||
+      window.matchMedia('(display-mode: standalone)').matches
+    );
+
+    // If on iOS PWA standalone mode where WebKit restricts SpeechRecognition daemon
+    if (isIOS && isStandalone) {
+      handlePwaRestrictionFallback();
+      return;
+    }
+
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      setTranscript('Speech recognition is not supported in this browser. You can type or use your keyboard microphone.');
+      handlePwaRestrictionFallback();
       return;
     }
 
@@ -91,6 +115,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       }
 
       cleanupAudio();
+      startTimeRef.current = Date.now();
 
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
@@ -104,6 +129,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
         setTranscript('');
         transcriptRef.current = '';
         setParsedResult(null);
+        setPwaRestrictedNotice(false);
         startWaveAnimation();
       };
 
@@ -144,12 +170,18 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       };
 
       recognition.onerror = (event: any) => {
+        const duration = Date.now() - startTimeRef.current;
         setIsListening(false);
         isListeningRef.current = false;
         cleanupAudio();
 
+        if (duration < 600 && !transcriptRef.current) {
+          handlePwaRestrictionFallback();
+          return;
+        }
+
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          setTranscript('Microphone permission was denied. Please allow microphone access in browser settings.');
+          setTranscript('Microphone permission was denied. Please allow microphone access in settings.');
         } else if (event.error === 'no-speech') {
           if (!transcriptRef.current.trim()) {
             setTranscript("Didn't catch any speech. Tap mic and try again.");
@@ -158,9 +190,16 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       };
 
       recognition.onend = () => {
+        const duration = Date.now() - startTimeRef.current;
         setIsListening(false);
         isListeningRef.current = false;
         cleanupAudio();
+
+        // If WebKit immediately ended in < 500ms with 0 transcript (iOS Home Screen / WebView restriction)
+        if (duration < 500 && !transcriptRef.current.trim() && !inputText.trim()) {
+          handlePwaRestrictionFallback();
+          return;
+        }
 
         const finalText = transcriptRef.current || inputText;
         if (finalText.trim()) {
@@ -174,7 +213,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       setIsListening(false);
       isListeningRef.current = false;
       cleanupAudio();
-      setTranscript('Could not start microphone: ' + (err.message || 'Please try again.'));
+      handlePwaRestrictionFallback();
     }
   };
 
@@ -326,6 +365,19 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
               ))}
             </div>
 
+            {/* iOS Home Screen / PWA restriction banner */}
+            {pwaRestrictedNotice && (
+              <div className="w-full bg-white/90 border border-black/15 rounded-2xl p-3 my-2 text-left shadow-xs">
+                <div className="flex items-center gap-1.5 text-black font-semibold text-[13px] mb-1">
+                  <Sparkles size={16} className="text-purple-600" />
+                  <span>Use Keyboard Dictation 🎙️</span>
+                </div>
+                <p className="text-[12px] text-black/70 leading-relaxed">
+                  iOS restricts Web Speech in Home Screen mode. Tap into the input below and press the <strong>🎙️ mic icon on your keyboard</strong> to dictate freely!
+                </p>
+              </div>
+            )}
+
             {/* Live Spoken Words Bubble */}
             {transcript && (
               <div className="w-full bg-white/80 border border-black/10 rounded-2xl p-3 my-2 shadow-xs">
@@ -352,13 +404,14 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
             {/* Divider */}
             <div className="w-full flex items-center gap-3 my-3">
               <div className="flex-1 h-[1px] bg-black/15" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-black/50">or type below</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-black/50">or type / dictate</span>
               <div className="flex-1 h-[1px] bg-black/15" />
             </div>
 
             {/* Clean Manual Input Form */}
             <form onSubmit={handleInputSubmit} className="w-full flex items-center gap-2 bg-white rounded-2xl p-1.5 shadow-sm border border-black/10">
               <input
+                ref={inputRef}
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
@@ -454,6 +507,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
                   setTranscript('');
                   transcriptRef.current = '';
                   setInputText('');
+                  setPwaRestrictedNotice(false);
                 }}
                 className="w-full h-10 text-[13px] font-medium text-black/70 hover:text-black text-center active:scale-95 transition-all cursor-pointer"
               >
