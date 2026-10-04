@@ -181,8 +181,17 @@ import Drip from '../components/ui/Drip.astro';
     } catch {}
   });
 
+  const isConfiguredSupabase = () => {
+    const url = import.meta.env.PUBLIC_SUPABASE_URL;
+    return url && !url.includes('drip-mock-project') && !url.includes('your-project');
+  };
+
   const handleGoogleAuth = async () => {
     document.cookie = 'drip_auth_session=1; path=/; max-age=31536000; SameSite=Lax';
+    if (!isConfiguredSupabase()) {
+      window.location.href = '/onboarding';
+      return;
+    }
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -208,6 +217,15 @@ import Drip from '../components/ui/Drip.astro';
       return;
     }
     document.cookie = 'drip_auth_session=1; path=/; max-age=31536000; SameSite=Lax';
+    try {
+      localStorage.setItem('drip_user_name', email.split('@')[0]);
+    } catch {}
+
+    if (!isConfiguredSupabase()) {
+      window.location.href = '/onboarding';
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
