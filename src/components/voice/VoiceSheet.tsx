@@ -35,10 +35,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
   const recognitionRef = React.useRef<any>(null);
   const isListeningRef = React.useRef<boolean>(false);
   const transcriptRef = React.useRef<string>('');
-  const audioContextRef = React.useRef<AudioContext | null>(null);
-  const analyserRef = React.useRef<AnalyserNode | null>(null);
-  const mediaStreamRef = React.useRef<MediaStream | null>(null);
-  const animFrameRef = React.useRef<number | null>(null);
+  const waveIntervalRef = React.useRef<any>(null);
 
   // Clean up when modal closes
   useEffect(() => {
@@ -53,58 +50,23 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
   }, [isOpen]);
 
   const cleanupAudio = () => {
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
-      mediaStreamRef.current = null;
-    }
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close().catch(() => {});
-      audioContextRef.current = null;
+    if (waveIntervalRef.current) {
+      clearInterval(waveIntervalRef.current);
+      waveIntervalRef.current = null;
     }
     setWaveformLevels(Array(24).fill(6));
   };
 
-  const startAudioVisualizer = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = stream;
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      const ctx = new AudioCtx();
-      audioContextRef.current = ctx;
-      const source = ctx.createMediaStreamSource(stream);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 64;
-      source.connect(analyser);
-      analyserRef.current = analyser;
-
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      const updateVisualizer = () => {
-        if (!isListeningRef.current) return;
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-        const avg = sum / dataArray.length;
-        const baseHeight = Math.max(6, Math.min(26, (avg / 255) * 45));
-
-        setWaveformLevels((prev) =>
-          prev.map((_, i) => {
-            const factor = Math.sin((i / 24) * Math.PI);
-            return Math.max(4, Math.round(baseHeight * factor + Math.random() * 4));
-          })
-        );
-        animFrameRef.current = requestAnimationFrame(updateVisualizer);
-      };
-      updateVisualizer();
-    } catch {
-      const interval = setInterval(() => {
-        if (!isListeningRef.current) {
-          clearInterval(interval);
-          return;
-        }
-        setWaveformLevels(Array.from({ length: 24 }, () => 6 + Math.random() * 14));
-      }, 120);
-    }
+  const startWaveAnimation = () => {
+    cleanupAudio();
+    waveIntervalRef.current = setInterval(() => {
+      setWaveformLevels(
+        Array.from({ length: 24 }, (_, i) => {
+          const factor = Math.sin((i / 24) * Math.PI);
+          return Math.max(5, Math.round(factor * (12 + Math.random() * 16)));
+        })
+      );
+    }, 90);
   };
 
   const startListening = () => {
@@ -127,7 +89,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       recognition.continuous = false;
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
-      recognition.lang = 'en-IN';
+      recognition.lang = navigator.language || 'en-IN';
 
       recognition.onstart = () => {
         setIsListening(true);
@@ -135,7 +97,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
         setTranscript('');
         transcriptRef.current = '';
         setParsedResult(null);
-        startAudioVisualizer();
+        startWaveAnimation();
       };
 
       recognition.onresult = (event: any) => {

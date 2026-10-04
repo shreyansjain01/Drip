@@ -3,6 +3,7 @@ import AppShell from '../layouts/AppShell.astro';
 import ScreenHeader from '../components/ui/ScreenHeader.astro';
 import Drip from '../components/ui/Drip.astro';
 import BottomNav from '../components/ui/BottomNav.astro';
+import SettingsProfileCard from '../components/settings/SettingsProfileCard';
 import { User, Bell, Key, Download, LogOut, Trash2, Smartphone, Shield, Sparkles } from 'lucide-react';
 
 const learnedSlots = [
@@ -24,19 +25,8 @@ const learnedSlots = [
       
       <!-- 1. Profile Section -->
       <div class="flex flex-col gap-2">
-        <span class="text-[12px] uppercase tracking-wider font-semibold text-black/50 px-1">Profile</span>
-        <div class="bg-white rounded-[20px] p-4 shadow-sm border border-black/5 flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div id="settings-avatar-box" class="w-12 h-12 rounded-[14px] bg-[#B8ACFA] flex items-center justify-center text-black font-bold text-lg overflow-hidden">
-              <span id="settings-avatar-char">E</span>
-            </div>
-            <div class="flex flex-col">
-              <span id="settings-profile-name" class="font-body-500 text-[16px] text-black">Ellie-May</span>
-              <span id="settings-profile-salary" class="font-caption text-black/50 text-[12px]">Monthly Salary: ₹75,000.00</span>
-            </div>
-          </div>
-          <a href="/onboarding" class="text-[13px] font-medium text-black/60 hover:text-black">Edit</a>
-        </div>
+        <span class="text-[12px] uppercase tracking-wider font-semibold text-black/50 px-1">Profile & Budget</span>
+        <SettingsProfileCard client:load />
       </div>
 
       <!-- 2. Learned Reminder Times -->

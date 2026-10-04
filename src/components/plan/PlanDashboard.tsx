@@ -8,6 +8,8 @@ import ProgressBar from '../ui/ProgressBar';
 import { formatINR } from '../../lib/money';
 import * as Icons from 'lucide-react';
 
+import EditProfileModal from '../settings/EditProfileModal';
+
 export const PlanDashboard: React.FC = () => {
   const expenses = useStore(expensesStore);
   const goals = useStore(goalsStore);
@@ -15,11 +17,9 @@ export const PlanDashboard: React.FC = () => {
   const [salaryNum, setSalaryNum] = useState(50000);
   const [expensePct, setExpensePct] = useState(60);
   const [savingsPct, setSavingsPct] = useState(40);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
-  useEffect(() => {
-    initExpenseStore();
-    initGoalStore();
-
+  const refreshPlan = () => {
     if (typeof window !== 'undefined') {
       const s = localStorage.getItem('drip_user_salary');
       const ep = localStorage.getItem('drip_expense_pct');
@@ -28,6 +28,12 @@ export const PlanDashboard: React.FC = () => {
       if (ep) setExpensePct(parseInt(ep, 10));
       if (sp) setSavingsPct(parseInt(sp, 10));
     }
+  };
+
+  useEffect(() => {
+    initExpenseStore();
+    initGoalStore();
+    refreshPlan();
   }, []);
 
   const salaryPaise = salaryNum * 100;
@@ -101,11 +107,28 @@ export const PlanDashboard: React.FC = () => {
         <div className="mt-1">
           <div className="flex justify-between items-center text-[12px] font-semibold text-black mb-1.5">
             <span>Allocation Split ({expensePct}% / {savingsPct}%)</span>
-            <span>Budget: {formatINR(plannedExpensesPaise)}</span>
+            <button
+              type="button"
+              onClick={() => setIsEditOpen(true)}
+              className="px-2.5 py-0.5 bg-black text-white text-[11px] font-semibold rounded-full active:scale-95 transition-transform cursor-pointer"
+            >
+              Edit Split
+            </button>
           </div>
           <AllocationBar segments={allocationSegments} totalPaise={salaryPaise} onLavenderSurface={true} />
         </div>
       </section>
+
+      {/* Edit Profile & Budget Modal */}
+      <EditProfileModal
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        onSaved={(updated) => {
+          setSalaryNum(updated.salary);
+          setExpensePct(updated.expensePct);
+          setSavingsPct(updated.savingsPct);
+        }}
+      />
 
       {/* SVG Drip Edge */}
       <div className="relative w-full overflow-hidden pointer-events-none select-none h-14 -mt-1 bg-black">

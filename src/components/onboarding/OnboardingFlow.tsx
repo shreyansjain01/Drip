@@ -45,8 +45,10 @@ export const OnboardingFlow: React.FC = () => {
       localStorage.setItem('drip_user_name', finalName);
       localStorage.setItem('drip_user_salary', salaryStr || '50000');
       localStorage.setItem('drip_expense_pct', expensePct.toString());
-      localStorage.setItem('drip_savings_pct', savingsPct.toString());
-      localStorage.setItem('drip_local_expenses', JSON.stringify([]));
+      const existingExpenses = localStorage.getItem('drip_local_expenses');
+      if (!existingExpenses) {
+        localStorage.setItem('drip_local_expenses', JSON.stringify([]));
+      }
 
       // Save to Supabase backend in parallel
       const profilePromise = fetch('/api/profile', {
