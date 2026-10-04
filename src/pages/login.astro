@@ -181,11 +181,6 @@ import Drip from '../components/ui/Drip.astro';
     } catch {}
   });
 
-  const isConfiguredSupabase = () => {
-    const url = import.meta.env.PUBLIC_SUPABASE_URL;
-    return url && !url.includes('drip-mock-project') && !url.includes('your-project');
-  };
-
   const handleGoogleAuth = async () => {
     document.cookie = 'drip_auth_session=1; path=/; max-age=31536000; SameSite=Lax';
     try {
@@ -201,7 +196,7 @@ import Drip from '../components/ui/Drip.astro';
       }
     } catch (err: any) {
       console.error('OAuth error:', err);
-      window.location.href = '/onboarding';
+      alert('Could not start Google Sign In. Please check your internet connection.');
     }
   };
 
@@ -219,25 +214,20 @@ import Drip from '../components/ui/Drip.astro';
       localStorage.setItem('drip_user_name', email.split('@')[0]);
     } catch {}
 
-    if (!isConfiguredSupabase()) {
-      window.location.href = '/onboarding';
-      return;
-    }
-
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/onboarding`
+          emailRedirectTo: `${window.location.origin}/api/auth/callback`
         }
       });
       if (error) {
-        window.location.href = '/onboarding';
+        alert('Sign-in link error: ' + error.message);
       } else {
         alert('Check your email for the magic sign-in link!');
       }
-    } catch {
-      window.location.href = '/onboarding';
+    } catch (err: any) {
+      alert('Could not send sign-in link: ' + (err.message || 'Please try again.'));
     }
   });
 </script>
