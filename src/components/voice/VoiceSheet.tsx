@@ -36,7 +36,10 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
   const recognitionRef = React.useRef<any>(null);
   const isListeningRef = React.useRef<boolean>(false);
   const transcriptRef = React.useRef<string>('');
-  const audioIntervalRef = React.useRef<any>(null);
+  const audioContextRef = React.useRef<AudioContext | null>(null);
+  const analyserRef = React.useRef<AnalyserNode | null>(null);
+  const mediaStreamRef = React.useRef<MediaStream | null>(null);
+  const animFrameRef = React.useRef<number | null>(null);
 
   // Auto-save countdown timer after voice detection
   useEffect(() => {
@@ -66,20 +69,61 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
     }
   }, [isOpen]);
 
-  // Waveform animation while listening
-  useEffect(() => {
-    if (isListening) {
-      audioIntervalRef.current = setInterval(() => {
-        setWaveformLevels(Array.from({ length: 24 }, () => 6 + Math.random() * 26));
-      }, 100);
-    } else {
-      if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
-      setWaveformLevels(Array(24).fill(6));
+  const cleanupAudio = () => {
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
     }
-    return () => {
-      if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
-    };
-  }, [isListening]);
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+    setWaveformLevels(Array(24).fill(6));
+  };
+
+  const startAudioVisualizer = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioCtx();
+      audioContextRef.current = ctx;
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 64;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      const updateVisualizer = () => {
+        if (!isListeningRef.current) return;
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        const avg = sum / dataArray.length;
+        const baseHeight = Math.max(6, Math.min(26, (avg / 255) * 45));
+
+        setWaveformLevels((prev) =>
+          prev.map((_, i) => {
+            const factor = Math.sin((i / 24) * Math.PI);
+            return Math.max(4, Math.round(baseHeight * factor + Math.random() * 4));
+          })
+        );
+        animFrameRef.current = requestAnimationFrame(updateVisualizer);
+      };
+      updateVisualizer();
+    } catch {
+      // If getUserMedia fails or not permitted, use subtle fallback
+      const interval = setInterval(() => {
+        if (!isListeningRef.current) {
+          clearInterval(interval);
+          return;
+        }
+        setWaveformLevels(Array.from({ length: 24 }, () => 6 + Math.random() * 14));
+      }, 120);
+    }
+  };
 
   const startListening = () => {
     const SpeechRecognition =
@@ -98,10 +142,10 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       }
 
       const recognition = new SpeechRecognition();
-      recognition.continuous = true;
+      recognition.continuous = false;
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
-      recognition.lang = navigator.language || 'en-IN';
+      recognition.lang = 'en-IN';
 
       recognition.onstart = () => {
         setIsListening(true);
@@ -110,6 +154,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
         transcriptRef.current = '';
         setParsedResult(null);
         setCountdown(null);
+        startAudioVisualizer();
       };
 
       recognition.onresult = (event: any) => {
@@ -121,56 +166,51 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
         transcriptRef.current = currentText;
         setInputText(currentText);
 
-        // If high-confidence final utterance with valid content
-        const lastResult = event.results[event.results.length - 1];
-        if (lastResult.isFinal && currentText.trim().length > 3) {
-          const parsed = parseVoiceInput(currentText);
-          if (parsed.amountPaise > 0) {
-            handleFinalTranscript(currentText);
-          }
+        const last = event.results[event.results.length - 1];
+        if (last && last.isFinal && currentText.trim()) {
+          handleFinalTranscript(currentText);
         }
       };
 
       recognition.onerror = (event: any) => {
-        // 'no-speech' is normal on mobile when pausing or background quietness
-        if (event.error === 'no-speech') {
-          return;
-        }
+        setIsListening(false);
+        isListeningRef.current = false;
+        cleanupAudio();
+
         if (event.error === 'not-allowed') {
-          setIsListening(false);
-          isListeningRef.current = false;
-          setTranscript('Microphone permission was denied. Please allow microphone access in your browser.');
+          setTranscript('Microphone permission was denied. Please allow microphone access.');
+        } else if (event.error === 'no-speech') {
+          if (!transcriptRef.current.trim()) {
+            setTranscript("Didn't catch any speech. Tap mic and try again.");
+          }
         }
       };
 
       recognition.onend = () => {
-        if (isListeningRef.current) {
-          // If mobile browser closed due to silence after speaking
-          if (transcriptRef.current && transcriptRef.current.trim().length > 0) {
-            handleFinalTranscript(transcriptRef.current);
-          } else {
-            // Keep microphone alive on mobile by restarting
-            try {
-              recognition.start();
-            } catch {
-              setIsListening(false);
-              isListeningRef.current = false;
-            }
-          }
+        setIsListening(false);
+        isListeningRef.current = false;
+        cleanupAudio();
+
+        const finalText = transcriptRef.current || inputText;
+        if (finalText.trim()) {
+          handleFinalTranscript(finalText);
         }
       };
 
       recognitionRef.current = recognition;
       recognition.start();
-    } catch {
+    } catch (err: any) {
       setIsListening(false);
       isListeningRef.current = false;
+      cleanupAudio();
+      setTranscript('Could not start microphone: ' + (err.message || 'Please try again.'));
     }
   };
 
   const stopListening = () => {
     setIsListening(false);
     isListeningRef.current = false;
+    cleanupAudio();
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -199,10 +239,8 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
     const matched = DEFAULT_CATEGORIES.find((c) => c.name === result.category);
     if (matched) setSelectedCatId(matched.id);
 
-    // Stop listening once speech is recognized
     stopListening();
 
-    // Start a 2-second auto-save countdown for hands-free logging
     if (result.amountPaise > 0) {
       setCountdown(2);
     }
