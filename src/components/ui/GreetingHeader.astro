@@ -63,8 +63,21 @@ const {
       if (avatarInitialEl) avatarInitialEl.textContent = localName.charAt(0).toUpperCase();
     }
 
-    // 2. Check Supabase session
+    // 2. Check Supabase session & Profile API
     try {
+      const profileRes = await fetch('/api/profile').then((r) => (r.ok ? r.json() : null));
+      if (profileRes?.authenticated && profileRes.user?.name) {
+        const name = profileRes.user.name;
+        if (greetingNameEl) greetingNameEl.textContent = `Hi, ${name}`;
+        if (avatarInitialEl) avatarInitialEl.textContent = name.charAt(0).toUpperCase();
+        localStorage.setItem('drip_user_name', name);
+
+        if (profileRes.user.avatarUrl && avatarContainer) {
+          avatarContainer.innerHTML = `<img src="${profileRes.user.avatarUrl}" alt="${name}" class="w-full h-full object-cover" />`;
+        }
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const detectedName = user.user_metadata?.full_name 

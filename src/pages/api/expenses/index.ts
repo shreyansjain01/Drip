@@ -25,18 +25,34 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const user = locals.user;
     const supabase = locals.supabase;
 
+    const CATEGORY_MAP: Record<string, string> = {
+      '1': '84648af9-c369-4752-9a61-73d3aba4d713',
+      '2': 'a3460b0d-4af5-415a-8210-fdc82b058f85',
+      '3': '3a5ff232-62c8-439f-b0ea-66722c149462',
+      '4': '530b6b6a-e294-4928-8c08-2a2feca470ce',
+      '5': '979eb89e-3eac-409a-b228-b4d30ece180f',
+      'food': '84648af9-c369-4752-9a61-73d3aba4d713',
+      'transport': 'a3460b0d-4af5-415a-8210-fdc82b058f85',
+      'shopping': '3a5ff232-62c8-439f-b0ea-66722c149462',
+      'bills': '530b6b6a-e294-4928-8c08-2a2feca470ce',
+      'groceries': '979eb89e-3eac-409a-b228-b4d30ece180f'
+    };
+
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(categoryId);
+    const resolvedCatId = isUUID ? categoryId : (CATEGORY_MAP[categoryId.toLowerCase()] || '84648af9-c369-4752-9a61-73d3aba4d713');
+
     if (user) {
       const { data, error } = await supabase
         .from('expenses')
         .insert({
           user_id: user.id,
           amount_paise: amountPaise,
-          category_id: categoryId,
+          category_id: resolvedCatId,
           label,
           source,
           spent_at: spentAt || new Date().toISOString()
         })
-        .select()
+        .select('*, categories(*)')
         .single();
 
       if (error) {

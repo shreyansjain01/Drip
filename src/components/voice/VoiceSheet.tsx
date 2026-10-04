@@ -35,6 +35,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
   
   const recognitionRef = React.useRef<any>(null);
   const isListeningRef = React.useRef<boolean>(false);
+  const transcriptRef = React.useRef<string>('');
   const audioIntervalRef = React.useRef<any>(null);
 
   // Auto-save countdown timer after voice detection
@@ -58,6 +59,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       stopListening();
       setParsedResult(null);
       setTranscript('');
+      transcriptRef.current = '';
       setInputText('');
       setCountdown(null);
       setIsSaving(false);
@@ -89,7 +91,6 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
     }
 
     try {
-      // Stop any existing instance
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
@@ -97,8 +98,8 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       }
 
       const recognition = new SpeechRecognition();
-      recognition.continuous = true; // Keep listening on mobile without stopping after 1 second
-      recognition.interimResults = true; // Show live transcription
+      recognition.continuous = true;
+      recognition.interimResults = true;
       recognition.maxAlternatives = 1;
       recognition.lang = navigator.language || 'en-IN';
 
@@ -106,6 +107,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
         setIsListening(true);
         isListeningRef.current = true;
         setTranscript('');
+        transcriptRef.current = '';
         setParsedResult(null);
         setCountdown(null);
       };
@@ -116,28 +118,46 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
           currentText += event.results[i][0].transcript;
         }
         setTranscript(currentText);
+        transcriptRef.current = currentText;
         setInputText(currentText);
 
-        // If high-confidence or pause detected, prepare result
+        // If high-confidence final utterance with valid content
         const lastResult = event.results[event.results.length - 1];
-        if (lastResult.isFinal && currentText.trim()) {
-          handleFinalTranscript(currentText);
+        if (lastResult.isFinal && currentText.trim().length > 3) {
+          const parsed = parseVoiceInput(currentText);
+          if (parsed.amountPaise > 0) {
+            handleFinalTranscript(currentText);
+          }
         }
       };
 
       recognition.onerror = (event: any) => {
-        // 'no-speech' is normal when user is thinking, don't abort
+        // 'no-speech' is normal on mobile when pausing or background quietness
         if (event.error === 'no-speech') {
           return;
         }
-        setIsListening(false);
-        isListeningRef.current = false;
+        if (event.error === 'not-allowed') {
+          setIsListening(false);
+          isListeningRef.current = false;
+          setTranscript('Microphone permission was denied. Please allow microphone access in your browser.');
+        }
       };
 
       recognition.onend = () => {
-        // If still marked as listening and no result yet, keep state or finish
-        setIsListening(false);
-        isListeningRef.current = false;
+        if (isListeningRef.current) {
+          // If mobile browser closed due to silence after speaking
+          if (transcriptRef.current && transcriptRef.current.trim().length > 0) {
+            handleFinalTranscript(transcriptRef.current);
+          } else {
+            // Keep microphone alive on mobile by restarting
+            try {
+              recognition.start();
+            } catch {
+              setIsListening(false);
+              isListeningRef.current = false;
+            }
+          }
+        }
       };
 
       recognitionRef.current = recognition;
@@ -160,9 +180,10 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
 
   const toggleMic = () => {
     if (isListening) {
+      const text = transcriptRef.current || transcript || inputText;
       stopListening();
-      if (transcript.trim()) {
-        handleFinalTranscript(transcript);
+      if (text.trim()) {
+        handleFinalTranscript(text);
       }
     } else {
       startListening();

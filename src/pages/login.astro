@@ -188,21 +188,19 @@ import Drip from '../components/ui/Drip.astro';
 
   const handleGoogleAuth = async () => {
     document.cookie = 'drip_auth_session=1; path=/; max-age=31536000; SameSite=Lax';
-    if (!isConfiguredSupabase()) {
-      window.location.href = '/onboarding';
-      return;
-    }
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/api/auth/callback`
         }
       });
       if (error) {
-        window.location.href = '/onboarding';
+        console.error('Google auth error:', error);
+        alert('Google Sign In error: ' + error.message);
       }
-    } catch {
+    } catch (err: any) {
+      console.error('OAuth error:', err);
       window.location.href = '/onboarding';
     }
   };

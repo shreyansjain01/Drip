@@ -38,27 +38,59 @@ export const OnboardingFlow: React.FC = () => {
   const handleFinish = async () => {
     // Save onboarding data and establish clean session
     try {
+      const finalName = name.trim() || 'User';
+      const finalSalary = parseInt(salaryStr || '50000', 10);
+
       document.cookie = 'drip_auth_session=1; path=/; max-age=31536000; SameSite=Lax';
-      localStorage.setItem('drip_user_name', name.trim() || 'User');
+      localStorage.setItem('drip_user_name', finalName);
       localStorage.setItem('drip_user_salary', salaryStr || '50000');
       localStorage.setItem('drip_expense_pct', expensePct.toString());
       localStorage.setItem('drip_savings_pct', savingsPct.toString());
       localStorage.setItem('drip_local_expenses', JSON.stringify([]));
-      
+
+      // Save to Supabase backend in parallel
+      const profilePromise = fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: finalName,
+          salary: finalSalary,
+          expensePct,
+          savingsPct,
+          onboardingDone: true
+        })
+      }).catch(() => {});
+
+      let goalPromise: Promise<any> = Promise.resolve();
       if (goalName && goalAmountStr && parseInt(goalAmountStr, 10) > 0) {
+        const goalNum = parseInt(goalAmountStr, 10);
         const initialGoal = {
           id: 'goal-' + Date.now(),
           name: goalName,
           savedPaise: 0,
-          targetPaise: parseInt(goalAmountStr, 10) * 100,
+          targetPaise: goalNum * 100,
           deadline: 'Dec 2026',
           color: '#B8ACFA',
           iconName: 'Shield'
         };
         localStorage.setItem('drip_user_goals', JSON.stringify([initialGoal]));
+
+        goalPromise = fetch('/api/goals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: goalName,
+            targetPaise: goalNum * 100,
+            deadline: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            icon: 'Shield',
+            color: '#B8ACFA'
+          })
+        }).catch(() => {});
       } else {
         localStorage.setItem('drip_user_goals', JSON.stringify([]));
       }
+
+      await Promise.all([profilePromise, goalPromise]);
     } catch {
       // ignore storage errors
     }
