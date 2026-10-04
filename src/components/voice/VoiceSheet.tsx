@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Check, X, Sparkles } from 'lucide-react';
+import { Mic, Check, X, Loader2 } from 'lucide-react';
 import { parseVoiceInput, type ParsedVoiceResult } from '../../lib/voice/parse';
 import AmountDisplay from '../ui/AmountDisplay';
 import CategoryChips from '../ui/CategoryChips';
 import { addLocalExpense } from '../../lib/stores/expenseStore';
 import { playExpenseAddedSound } from '../../lib/audio';
+import { AudioVoiceRecorder } from '../../lib/voice/recorder';
 
 interface VoiceSheetProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ const DEFAULT_CATEGORIES = [
 
 export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved }) => {
   const [isListening, setIsListening] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [inputText, setInputText] = useState('');
   const [parsedResult, setParsedResult] = useState<ParsedVoiceResult | null>(null);
@@ -30,24 +32,22 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
   const [selectedCatId, setSelectedCatId] = useState('1');
   const [waveformLevels, setWaveformLevels] = useState<number[]>(Array(24).fill(6));
   const [isSaving, setIsSaving] = useState(false);
-  const [pwaRestrictedNotice, setPwaRestrictedNotice] = useState(false);
   
   const recognitionRef = useRef<any>(null);
+  const audioRecorderRef = useRef<AudioVoiceRecorder | null>(null);
   const isListeningRef = useRef<boolean>(false);
   const transcriptRef = useRef<string>('');
-  const waveIntervalRef = useRef<any>(null);
   const silenceTimeoutRef = useRef<any>(null);
-  const startTimeRef = useRef<number>(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const cleanupAudio = () => {
-    if (waveIntervalRef.current) {
-      clearInterval(waveIntervalRef.current);
-      waveIntervalRef.current = null;
-    }
     if (silenceTimeoutRef.current) {
       clearTimeout(silenceTimeoutRef.current);
       silenceTimeoutRef.current = null;
+    }
+    if (audioRecorderRef.current) {
+      audioRecorderRef.current.cleanup();
+      audioRecorderRef.current = null;
     }
     setWaveformLevels(Array(24).fill(6));
   };
@@ -61,180 +61,172 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       transcriptRef.current = '';
       setInputText('');
       setIsSaving(false);
-      setPwaRestrictedNotice(false);
+      setIsTranscribing(false);
     }
   }, [isOpen]);
 
-  const startWaveAnimation = () => {
-    cleanupAudio();
-    waveIntervalRef.current = setInterval(() => {
-      setWaveformLevels(
-        Array.from({ length: 24 }, (_, i) => {
-          const factor = Math.sin((i / 24) * Math.PI);
-          return Math.max(5, Math.round(factor * (12 + Math.random() * 16)));
-        })
-      );
-    }, 90);
-  };
-
-  const handlePwaRestrictionFallback = () => {
-    setPwaRestrictedNotice(true);
-    setTranscript('');
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 150);
-  };
-
-  // Synchronous start to ensure browser user-gesture token is preserved
-  const startListening = () => {
-    const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent || '');
-    const isStandalone = typeof window !== 'undefined' && (
-      ('standalone' in (navigator as any) && (navigator as any).standalone) ||
-      window.matchMedia('(display-mode: standalone)').matches
-    );
-
-    // If on iOS PWA standalone mode where WebKit restricts SpeechRecognition daemon
-    if (isIOS && isStandalone) {
-      handlePwaRestrictionFallback();
-      return;
-    }
-
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      handlePwaRestrictionFallback();
-      return;
-    }
-
+  const startListening = async () => {
     try {
-      if (recognitionRef.current) {
+      setIsListening(true);
+      isListeningRef.current = true;
+      setTranscript('');
+      transcriptRef.current = '';
+      setParsedResult(null);
+      setIsTranscribing(false);
+
+      // 1. Initialize Audio Recorder with live visualizer
+      const recorder = new AudioVoiceRecorder();
+      audioRecorderRef.current = recorder;
+      await recorder.start((levels) => {
+        setWaveformLevels(levels);
+      });
+
+      // 2. Also attach SpeechRecognition if supported
+      const SpeechRecognition =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+      if (SpeechRecognition) {
         try {
-          recognitionRef.current.abort();
-        } catch {}
-      }
-
-      cleanupAudio();
-      startTimeRef.current = Date.now();
-
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.maxAlternatives = 1;
-      recognition.lang = navigator.language || 'en-IN';
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        isListeningRef.current = true;
-        setTranscript('');
-        transcriptRef.current = '';
-        setParsedResult(null);
-        setPwaRestrictedNotice(false);
-        startWaveAnimation();
-      };
-
-      recognition.onresult = (event: any) => {
-        let currentText = '';
-        for (let i = 0; i < event.results.length; i++) {
-          currentText += event.results[i][0].transcript;
-        }
-        setTranscript(currentText);
-        transcriptRef.current = currentText;
-        setInputText(currentText);
-
-        // Reset silence detection timer whenever words are received
-        if (silenceTimeoutRef.current) {
-          clearTimeout(silenceTimeoutRef.current);
-          silenceTimeoutRef.current = null;
-        }
-
-        const last = event.results[event.results.length - 1];
-        if (last && last.isFinal && currentText.trim()) {
-          stopListening();
-          handleFinalTranscript(currentText);
-          return;
-        }
-
-        // Automatically cut off 1.1s after user stops speaking
-        if (currentText.trim()) {
-          silenceTimeoutRef.current = setTimeout(() => {
-            if (isListeningRef.current) {
-              const textToProcess = transcriptRef.current || currentText;
-              stopListening();
-              if (textToProcess.trim()) {
-                handleFinalTranscript(textToProcess);
-              }
-            }
-          }, 1100);
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        const duration = Date.now() - startTimeRef.current;
-        setIsListening(false);
-        isListeningRef.current = false;
-        cleanupAudio();
-
-        if (duration < 600 && !transcriptRef.current) {
-          handlePwaRestrictionFallback();
-          return;
-        }
-
-        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          setTranscript('Microphone permission was denied. Please allow microphone access in settings.');
-        } else if (event.error === 'no-speech') {
-          if (!transcriptRef.current.trim()) {
-            setTranscript("Didn't catch any speech. Tap mic and try again.");
+          if (recognitionRef.current) {
+            try {
+              recognitionRef.current.abort();
+            } catch {}
           }
+
+          const recognition = new SpeechRecognition();
+          recognition.continuous = false;
+          recognition.interimResults = true;
+          recognition.maxAlternatives = 1;
+          recognition.lang = navigator.language || 'en-IN';
+
+          recognition.onresult = (event: any) => {
+            let currentText = '';
+            for (let i = 0; i < event.results.length; i++) {
+              currentText += event.results[i][0].transcript;
+            }
+            if (currentText.trim()) {
+              setTranscript(currentText);
+              transcriptRef.current = currentText;
+              setInputText(currentText);
+            }
+
+            if (silenceTimeoutRef.current) {
+              clearTimeout(silenceTimeoutRef.current);
+            }
+
+            const last = event.results[event.results.length - 1];
+            if (last && last.isFinal && currentText.trim()) {
+              stopListening();
+              handleFinalTranscript(currentText);
+              return;
+            }
+
+            // Silence auto-stop
+            if (currentText.trim()) {
+              silenceTimeoutRef.current = setTimeout(() => {
+                if (isListeningRef.current) {
+                  stopListening();
+                  handleFinalTranscript(transcriptRef.current || currentText);
+                }
+              }, 1200);
+            }
+          };
+
+          recognition.onerror = () => {
+            // SpeechRecognition may fail in restricted WebViews, AudioVoiceRecorder keeps recording!
+          };
+
+          recognition.onend = () => {
+            if (isListeningRef.current && transcriptRef.current.trim()) {
+              stopListening();
+              handleFinalTranscript(transcriptRef.current);
+            }
+          };
+
+          recognitionRef.current = recognition;
+          recognition.start();
+        } catch (e) {
+          console.warn('SpeechRecognition start notice:', e);
         }
-      };
-
-      recognition.onend = () => {
-        const duration = Date.now() - startTimeRef.current;
-        setIsListening(false);
-        isListeningRef.current = false;
-        cleanupAudio();
-
-        // If WebKit immediately ended in < 500ms with 0 transcript (iOS Home Screen / WebView restriction)
-        if (duration < 500 && !transcriptRef.current.trim() && !inputText.trim()) {
-          handlePwaRestrictionFallback();
-          return;
-        }
-
-        const finalText = transcriptRef.current || inputText;
-        if (finalText.trim()) {
-          handleFinalTranscript(finalText);
-        }
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
+      }
     } catch (err: any) {
+      console.error('Error starting voice recording:', err);
       setIsListening(false);
       isListeningRef.current = false;
       cleanupAudio();
-      handlePwaRestrictionFallback();
+      setTranscript('Microphone access was denied or not available. You can type below.');
     }
   };
 
-  const stopListening = () => {
+  const stopListening = async () => {
     setIsListening(false);
     isListeningRef.current = false;
-    cleanupAudio();
+
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
       } catch {}
     }
+
+    let audioBlob: Blob | null = null;
+    if (audioRecorderRef.current) {
+      try {
+        audioBlob = await audioRecorderRef.current.stop();
+      } catch {}
+      audioRecorderRef.current = null;
+    }
+
+    setWaveformLevels(Array(24).fill(6));
+
+    const currentText = transcriptRef.current || transcript || inputText;
+    if (currentText.trim()) {
+      handleFinalTranscript(currentText);
+      return;
+    }
+
+    // If client SpeechRecognition did not yield words, transcribe audio blob via backend
+    if (audioBlob && audioBlob.size > 1000) {
+      setIsTranscribing(true);
+      try {
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.mp4');
+
+        const res = await fetch('/api/voice/transcribe', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.text && data.text.trim()) {
+            setTranscript(data.text);
+            setInputText(data.text);
+            handleFinalTranscript(data.text);
+            setIsTranscribing(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Backend transcription error:', err);
+      } finally {
+        setIsTranscribing(false);
+      }
+    }
+
+    // If still no speech detected
+    if (!transcriptRef.current.trim()) {
+      setTranscript("Didn't catch any speech. Tap mic and try again or type below.");
+    }
   };
 
   const toggleMic = () => {
     if (isListening) {
-      const text = transcriptRef.current || transcript || inputText;
       stopListening();
-      if (text.trim()) {
-        handleFinalTranscript(text);
-      }
     } else {
       startListening();
     }
@@ -248,8 +240,6 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
     setEditableLabel(result.label);
     const matched = DEFAULT_CATEGORIES.find((c) => c.name === result.category);
     if (matched) setSelectedCatId(matched.id);
-
-    stopListening();
   };
 
   const simulateSpeech = (sampleText: string) => {
@@ -329,11 +319,15 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
           <div className="w-full flex flex-col items-center text-center">
             
             <h3 className="font-title text-[20px] font-semibold text-black mb-1">
-              {isListening ? 'Listening...' : 'Voice Expense'}
+              {isTranscribing ? 'Processing voice...' : isListening ? 'Listening...' : 'Voice Expense'}
             </h3>
             
             <p className="font-caption text-black/60 text-[13px] mb-3">
-              {isListening ? 'Speak now e.g. "Paid 60 for breakfast"' : 'Tap mic and speak your expense'}
+              {isTranscribing
+                ? 'Converting your voice into expense details...'
+                : isListening
+                ? 'Speak now e.g. "Paid 60 for breakfast"'
+                : 'Tap mic and speak your expense'}
             </p>
 
             {/* Mic Circle & Waves */}
@@ -347,10 +341,15 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
               <button
                 type="button"
                 onClick={toggleMic}
-                className="w-18 h-18 rounded-full bg-black flex items-center justify-center text-[#B8ACFA] shadow-xl relative z-10 active:scale-95 transition-all cursor-pointer"
+                disabled={isTranscribing}
+                className="w-18 h-18 rounded-full bg-black flex items-center justify-center text-[#B8ACFA] shadow-xl relative z-10 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                 aria-label={isListening ? 'Stop listening' : 'Start listening'}
               >
-                <Mic size={30} strokeWidth={2.2} />
+                {isTranscribing ? (
+                  <Loader2 size={30} className="animate-spin text-[#B8ACFA]" />
+                ) : (
+                  <Mic size={30} strokeWidth={2.2} />
+                )}
               </button>
             </div>
 
@@ -359,24 +358,11 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
               {waveformLevels.map((h, i) => (
                 <div
                   key={i}
-                  className="w-[3px] bg-black/80 rounded-full transition-all duration-100"
+                  className="w-[3px] bg-black/80 rounded-full transition-all duration-75"
                   style={{ height: isListening ? `${Math.min(h, 24)}px` : '5px' }}
                 />
               ))}
             </div>
-
-            {/* iOS Home Screen / PWA restriction banner */}
-            {pwaRestrictedNotice && (
-              <div className="w-full bg-white/90 border border-black/15 rounded-2xl p-3 my-2 text-left shadow-xs">
-                <div className="flex items-center gap-1.5 text-black font-semibold text-[13px] mb-1">
-                  <Sparkles size={16} className="text-purple-600" />
-                  <span>Use Keyboard Dictation 🎙️</span>
-                </div>
-                <p className="text-[12px] text-black/70 leading-relaxed">
-                  iOS restricts Web Speech in Home Screen mode. Tap into the input below and press the <strong>🎙️ mic icon on your keyboard</strong> to dictate freely!
-                </p>
-              </div>
-            )}
 
             {/* Live Spoken Words Bubble */}
             {transcript && (
@@ -404,7 +390,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
             {/* Divider */}
             <div className="w-full flex items-center gap-3 my-3">
               <div className="flex-1 h-[1px] bg-black/15" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-black/50">or type / dictate</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-black/50">or type below</span>
               <div className="flex-1 h-[1px] bg-black/15" />
             </div>
 
@@ -507,7 +493,6 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
                   setTranscript('');
                   transcriptRef.current = '';
                   setInputText('');
-                  setPwaRestrictedNotice(false);
                 }}
                 className="w-full h-10 text-[13px] font-medium text-black/70 hover:text-black text-center active:scale-95 transition-all cursor-pointer"
               >
