@@ -35,6 +35,19 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
   const isListeningRef = useRef<boolean>(false);
   const transcriptRef = useRef<string>('');
   const waveIntervalRef = useRef<any>(null);
+  const silenceTimeoutRef = useRef<any>(null);
+
+  const cleanupAudio = () => {
+    if (waveIntervalRef.current) {
+      clearInterval(waveIntervalRef.current);
+      waveIntervalRef.current = null;
+    }
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+    setWaveformLevels(Array(24).fill(6));
+  };
 
   // Clean up when modal closes
   useEffect(() => {
@@ -47,14 +60,6 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       setIsSaving(false);
     }
   }, [isOpen]);
-
-  const cleanupAudio = () => {
-    if (waveIntervalRef.current) {
-      clearInterval(waveIntervalRef.current);
-      waveIntervalRef.current = null;
-    }
-    setWaveformLevels(Array(24).fill(6));
-  };
 
   const startWaveAnimation = () => {
     cleanupAudio();
@@ -85,6 +90,8 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
         } catch {}
       }
 
+      cleanupAudio();
+
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = true;
@@ -109,9 +116,30 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
         transcriptRef.current = currentText;
         setInputText(currentText);
 
+        // Reset silence detection timer whenever words are received
+        if (silenceTimeoutRef.current) {
+          clearTimeout(silenceTimeoutRef.current);
+          silenceTimeoutRef.current = null;
+        }
+
         const last = event.results[event.results.length - 1];
         if (last && last.isFinal && currentText.trim()) {
+          stopListening();
           handleFinalTranscript(currentText);
+          return;
+        }
+
+        // Automatically cut off 1.1s after user stops speaking
+        if (currentText.trim()) {
+          silenceTimeoutRef.current = setTimeout(() => {
+            if (isListeningRef.current) {
+              const textToProcess = transcriptRef.current || currentText;
+              stopListening();
+              if (textToProcess.trim()) {
+                handleFinalTranscript(textToProcess);
+              }
+            }
+          }, 1100);
         }
       };
 
