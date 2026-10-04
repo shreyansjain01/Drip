@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Mic, MicOff, Check, X, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Mic, Check, X } from 'lucide-react';
 import { parseVoiceInput, type ParsedVoiceResult } from '../../lib/voice/parse';
 import AmountDisplay from '../ui/AmountDisplay';
 import CategoryChips from '../ui/CategoryChips';
-import { formatINR } from '../../lib/money';
 import { addLocalExpense } from '../../lib/stores/expenseStore';
 import { playExpenseAddedSound } from '../../lib/audio';
 
@@ -32,10 +31,11 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
   const [waveformLevels, setWaveformLevels] = useState<number[]>(Array(24).fill(6));
   const [isSaving, setIsSaving] = useState(false);
   
-  const recognitionRef = React.useRef<any>(null);
-  const isListeningRef = React.useRef<boolean>(false);
-  const transcriptRef = React.useRef<string>('');
-  const waveIntervalRef = React.useRef<any>(null);
+  const recognitionRef = useRef<any>(null);
+  const isListeningRef = useRef<boolean>(false);
+  const transcriptRef = useRef<string>('');
+  const waveIntervalRef = useRef<any>(null);
+  const restartCountRef = useRef<number>(0);
 
   // Clean up when modal closes
   useEffect(() => {
@@ -46,6 +46,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       transcriptRef.current = '';
       setInputText('');
       setIsSaving(false);
+      restartCountRef.current = 0;
     }
   }, [isOpen]);
 
@@ -69,13 +70,29 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
     }, 90);
   };
 
-  const startListening = () => {
+  const startListening = async () => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      setTranscript('Speech recognition is not supported in this browser. You can type or use the keyboard mic.');
+      setTranscript('Speech recognition is not supported in this browser. You can type or use your keyboard microphone.');
       return;
+    }
+
+    // Step 1: Ensure OS microphone permission is granted without locking audio hardware
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+      } catch (permErr: any) {
+        if (permErr.name === 'NotAllowedError' || permErr.name === 'PermissionDeniedError') {
+          setIsListening(false);
+          isListeningRef.current = false;
+          cleanupAudio();
+          setTranscript('Microphone permission was denied. Please allow microphone access in settings.');
+          return;
+        }
+      }
     }
 
     try {
@@ -86,10 +103,13 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       }
 
       const recognition = new SpeechRecognition();
-      recognition.continuous = false;
+      // Use continuous = true to prevent Google App / Android WebViews from prematurely cutting off
+      recognition.continuous = true;
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
-      recognition.lang = navigator.language || 'en-IN';
+      
+      const userLang = (navigator.language || 'en-IN').toLowerCase();
+      recognition.lang = userLang.startsWith('en') ? 'en-IN' : (navigator.language || 'en-IN');
 
       recognition.onstart = () => {
         setIsListening(true);
@@ -101,52 +121,84 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       };
 
       recognition.onresult = (event: any) => {
-        let currentText = '';
-        for (let i = 0; i < event.results.length; i++) {
-          currentText += event.results[i][0].transcript;
-        }
-        setTranscript(currentText);
-        transcriptRef.current = currentText;
-        setInputText(currentText);
+        let interimText = '';
+        let finalText = '';
 
-        const last = event.results[event.results.length - 1];
-        if (last && last.isFinal && currentText.trim()) {
-          handleFinalTranscript(currentText);
+        for (let i = 0; i < event.results.length; ++i) {
+          const res = event.results[i];
+          if (res.isFinal) {
+            finalText += res[0].transcript + ' ';
+          } else {
+            interimText += res[0].transcript;
+          }
+        }
+
+        const combined = (finalText + interimText).trim();
+        if (combined) {
+          setTranscript(combined);
+          transcriptRef.current = combined;
+          setInputText(combined);
         }
       };
 
       recognition.onerror = (event: any) => {
+        console.warn('Speech recognition notice:', event.error);
+        if (event.error === 'no-speech') {
+          // In Google App, no-speech may fire intermittently during pauses; don't terminate immediately
+          return;
+        }
+        if (event.error === 'aborted') {
+          return;
+        }
+
         setIsListening(false);
         isListeningRef.current = false;
         cleanupAudio();
 
-        if (event.error === 'not-allowed') {
-          setTranscript('Microphone permission was denied. Please allow microphone access in browser settings.');
-        } else if (event.error === 'no-speech') {
-          if (!transcriptRef.current.trim()) {
-            setTranscript("Didn't catch any speech. Tap mic and try again.");
-          }
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          setTranscript('Microphone permission was denied. Please allow microphone access in settings.');
+        } else if (event.error === 'network') {
+          setTranscript('Network issue with speech recognition. Please check your connection or type below.');
+        } else {
+          setTranscript(`Recognition message: ${event.error}. You can also type below.`);
         }
       };
 
       recognition.onend = () => {
+        // If recognition closed prematurely while the user was speaking, attempt graceful restart (up to 2 times)
+        if (isListeningRef.current) {
+          if (!transcriptRef.current.trim() && restartCountRef.current < 2) {
+            restartCountRef.current += 1;
+            try {
+              recognition.start();
+              return;
+            } catch {}
+          }
+
+          setIsListening(false);
+          isListeningRef.current = false;
+          cleanupAudio();
+
+          const finalText = transcriptRef.current || inputText;
+          if (finalText.trim()) {
+            handleFinalTranscript(finalText);
+          }
+          return;
+        }
+
         setIsListening(false);
         isListeningRef.current = false;
         cleanupAudio();
-
-        const finalText = transcriptRef.current || inputText;
-        if (finalText.trim()) {
-          handleFinalTranscript(finalText);
-        }
       };
 
+      restartCountRef.current = 0;
       recognitionRef.current = recognition;
       recognition.start();
     } catch (err: any) {
       setIsListening(false);
       isListeningRef.current = false;
       cleanupAudio();
-      setTranscript('Could not start microphone: ' + (err.message || 'Please try again.'));
+      setTranscript('Could not start microphone: ' + (err.message || 'Please try again or type below.'));
     }
   };
 
@@ -440,4 +492,3 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
 };
 
 export default VoiceSheet;
-
