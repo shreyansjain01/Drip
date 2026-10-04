@@ -45,6 +45,13 @@ const NUMBER_WORDS: Record<string, number> = {
   ninety: 90,
   hundred: 100,
   thousand: 1000,
+  lakh: 100000,
+  lac: 100000,
+  lakhs: 100000,
+  lacs: 100000,
+  crore: 10000000,
+  crores: 10000000,
+  cr: 10000000,
   // Basic Hindi number words
   ek: 1,
   do: 2,
@@ -56,17 +63,27 @@ const NUMBER_WORDS: Record<string, number> = {
   aath: 8,
   nau: 9,
   das: 10,
+  gyarah: 11,
+  barah: 12,
+  terah: 13,
+  chaudah: 14,
+  pandrah: 15,
+  solah: 16,
+  satrah: 17,
+  atharah: 18,
+  unnees: 19,
   bees: 20,
   tees: 30,
   chalis: 40,
   pachaas: 50,
+  pachas: 50,
   saath: 60,
   sattar: 70,
   assi: 80,
   nabbe: 90,
   sau: 100,
   hazaar: 1000,
-  lakh: 100000
+  hazar: 1000
 };
 
 const FILLER_WORDS = new Set([
@@ -121,7 +138,10 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'food',
     'samosa',
     'meal',
-    'eating'
+    'eating',
+    'bar',
+    'pub',
+    'drinks'
   ],
   Transport: [
     'auto',
@@ -139,7 +159,17 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'parking',
     'toll',
     'travel',
-    'commute'
+    'commute',
+    'hotel',
+    'stay',
+    'resort',
+    'room',
+    'airbnb',
+    'lodge',
+    'hostel',
+    'oyo',
+    'makemytrip',
+    'agoda'
   ],
   Shopping: [
     'shopping',
@@ -153,7 +183,10 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'store',
     'zara',
     'h&m',
-    'dress'
+    'dress',
+    'laptop',
+    'phone',
+    'mobile'
   ],
   'Bills & Utilities': [
     'bill',
@@ -172,7 +205,10 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'spotify',
     'apple',
     'icloud',
-    'prime'
+    'prime',
+    'emi',
+    'insurance',
+    'loan'
   ],
   Groceries: [
     'groceries',
@@ -212,12 +248,14 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'apollo',
     '1mg',
     'gym',
-    'fitness'
+    'fitness',
+    'test',
+    'tests'
   ]
 };
 
 /**
- * Parses word numbers (e.g. "two hundred and fifty" -> 250, "one point five k" -> 1500)
+ * Parses word numbers (e.g. "two hundred and fifty" -> 250, "ten thousand" -> 10000, "one lakh" -> 100000)
  */
 function parseSpokenNumberWords(tokens: string[]): { value: number; usedTokens: Set<number> } | null {
   let total = 0;
@@ -228,7 +266,7 @@ function parseSpokenNumberWords(tokens: string[]): { value: number; usedTokens: 
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i].toLowerCase();
 
-    // Check for "1.5k" or "2k" or "2.5k"
+    // Check for "1.5k" or "2k" or "10k"
     const kMatch = t.match(/^(\d+(?:\.\d+)?)\s*k$/);
     if (kMatch) {
       used.add(i);
@@ -241,7 +279,7 @@ function parseSpokenNumberWords(tokens: string[]): { value: number; usedTokens: 
     if (val !== undefined) {
       foundAny = true;
       used.add(i);
-      if (val === 100 || val === 1000 || val === 100000) {
+      if (val === 100 || val === 1000 || val === 100000 || val === 10000000) {
         current = current === 0 ? val : current * val;
         if (val >= 1000) {
           total += current;
@@ -273,7 +311,12 @@ export function parseVoiceInput(raw: string): ParsedVoiceResult {
     };
   }
 
-  const lower = text.toLowerCase();
+  // Pre-normalize: remove number formatting commas inside digits (e.g. 10,000 -> 10000, 1,00,000 -> 100000)
+  const normalizedText = text
+    .replace(/\b(\d+)(?:,(\d+))+\b/g, (m) => m.replace(/,/g, ''))
+    .replace(/(\d+),(\d+)/g, '$1$2');
+
+  const lower = normalizedText.toLowerCase();
   let intent: 'expense' | 'goal_contribution' | 'income' = 'expense';
   let goalName: string | undefined;
 
@@ -305,32 +348,42 @@ export function parseVoiceInput(raw: string): ParsedVoiceResult {
   // 2. Extract Amount
   let amountRupees = 0;
   let confidence = 0.5;
-  const tokens = lower.split(/[\s,]+/);
+  const tokens = lower.split(/\s+/).filter(Boolean);
   let usedTokenIndices = new Set<number>();
 
-  // Pattern A: Digits with optional currency symbol or k (e.g. ₹60, rs 1500, 1.5k, 1,200)
-  const regexAmount = /(?:₹|rs\.?|inr)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:k|thousand|rupees|rs)?/i;
-  const match = lower.match(regexAmount);
+  // Pattern A: Multipliers like "10k", "1.5k", "10 thousand", "1 lakh", "2.5 lakh", "1 crore"
+  const lakhMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|lakhs|lacs)\b/i);
+  const croreMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:crore|crores|cr)\b/i);
+  const thousandMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:thousand|hazaar|hazar|k)\b/i);
 
-  // Check for multiplier "1.5k"
-  const multiplierMatch = lower.match(/(\d+(?:\.\d+)?)\s*k\b/i);
-  if (multiplierMatch) {
-    amountRupees = parseFloat(multiplierMatch[1]) * 1000;
+  if (croreMatch) {
+    amountRupees = parseFloat(croreMatch[1]) * 10000000;
     confidence = 0.95;
-    // Mark token used
     tokens.forEach((t, i) => {
-      if (t.includes(multiplierMatch[1]) || t === 'k') usedTokenIndices.add(i);
+      if (t.includes(croreMatch[1]) || /^(crore|crores|cr)$/.test(t)) usedTokenIndices.add(i);
+    });
+  } else if (lakhMatch) {
+    amountRupees = parseFloat(lakhMatch[1]) * 100000;
+    confidence = 0.95;
+    tokens.forEach((t, i) => {
+      if (t.includes(lakhMatch[1]) || /^(lakh|lac|lakhs|lacs)$/.test(t)) usedTokenIndices.add(i);
+    });
+  } else if (thousandMatch) {
+    amountRupees = parseFloat(thousandMatch[1]) * 1000;
+    confidence = 0.95;
+    tokens.forEach((t, i) => {
+      if (t.includes(thousandMatch[1]) || /^(thousand|hazaar|hazar|k)$/.test(t)) usedTokenIndices.add(i);
     });
   } else {
-    // Check for standard numbers
-    const numTokenIdx = tokens.findIndex((t) => /^\d+(?:,\d+)*(?:\.\d+)?$/.test(t.replace(/[₹,]/g, '')));
+    // Check for standard digits (e.g. "10000", "250", "₹10000")
+    const numTokenIdx = tokens.findIndex((t) => /^\d+(?:\.\d+)?$/.test(t.replace(/[₹,rs]/g, '')));
     if (numTokenIdx !== -1) {
-      const cleanNum = tokens[numTokenIdx].replace(/[₹,]/g, '');
+      const cleanNum = tokens[numTokenIdx].replace(/[₹,rs]/g, '');
       amountRupees = parseFloat(cleanNum);
-      confidence = 0.9;
+      confidence = 0.92;
       usedTokenIndices.add(numTokenIdx);
     } else {
-      // Try spoken number words (e.g. "ninety", "two hundred and fifty")
+      // Try spoken number words (e.g. "ten thousand", "ninety", "two hundred and fifty")
       const wordRes = parseSpokenNumberWords(tokens);
       if (wordRes && wordRes.value > 0) {
         amountRupees = wordRes.value;
@@ -374,14 +427,14 @@ export function parseVoiceInput(raw: string): ParsedVoiceResult {
   const labelTokens = tokens.filter((t, idx) => {
     if (usedTokenIndices.has(idx)) return false;
     const clean = t.replace(/[^a-z0-9]/g, '');
-    return clean && !FILLER_WORDS.has(clean);
+    return clean && !FILLER_WORDS.has(clean) && !/^\d+$/.test(clean);
   });
 
   let label = labelTokens.join(' ');
   if (!label) {
     label = category !== 'General' ? category : intent === 'income' ? 'Income' : 'Expense';
   } else {
-    // Capitalize first letter
+    // Capitalize first letter of each word or sentence
     label = label.charAt(0).toUpperCase() + label.slice(1);
   }
 

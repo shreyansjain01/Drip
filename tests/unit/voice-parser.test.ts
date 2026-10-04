@@ -10,6 +10,39 @@ describe('Voice & Text Natural Language Parser', () => {
     expect(res.confidence).toBeGreaterThanOrEqual(0.6);
   });
 
+  it('parses comma-formatted 5-digit number: "10,000 hotel"', () => {
+    const res = parseVoiceInput('10,000 hotel');
+    expect(res.amountPaise).toBe(1000000);
+    expect(res.label).toBe('Hotel');
+    expect(res.category).toBe('Transport');
+  });
+
+  it('parses 5-digit number without comma: "10000 hotel"', () => {
+    const res = parseVoiceInput('10000 hotel');
+    expect(res.amountPaise).toBe(1000000);
+    expect(res.label).toBe('Hotel');
+  });
+
+  it('parses 5-digit word numbers: "ten thousand hotel"', () => {
+    const res = parseVoiceInput('ten thousand hotel');
+    expect(res.amountPaise).toBe(1000000);
+    expect(res.label).toBe('Hotel');
+  });
+
+  it('parses: "paid 25,000 for rent"', () => {
+    const res = parseVoiceInput('paid 25,000 for rent');
+    expect(res.amountPaise).toBe(2500000);
+    expect(res.label).toBe('Rent');
+    expect(res.category).toBe('Bills & Utilities');
+  });
+
+  it('parses Indian comma format: "1,50,000 laptop"', () => {
+    const res = parseVoiceInput('1,50,000 laptop');
+    expect(res.amountPaise).toBe(15000000);
+    expect(res.label).toBe('Laptop');
+    expect(res.category).toBe('Shopping');
+  });
+
   it('parses: "snacks 90 rupees"', () => {
     const res = parseVoiceInput('snacks 90 rupees');
     expect(res.amountPaise).toBe(9000);
