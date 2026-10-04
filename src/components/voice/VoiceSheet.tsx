@@ -37,25 +37,39 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
   const audioRecorderRef = useRef<AudioVoiceRecorder | null>(null);
   const isListeningRef = useRef<boolean>(false);
   const transcriptRef = useRef<string>('');
+  const waveIntervalRef = useRef<any>(null);
   const silenceTimeoutRef = useRef<any>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const cleanupAudio = () => {
     if (silenceTimeoutRef.current) {
       clearTimeout(silenceTimeoutRef.current);
       silenceTimeoutRef.current = null;
     }
+    if (waveIntervalRef.current) {
+      clearInterval(waveIntervalRef.current);
+      waveIntervalRef.current = null;
+    }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {}
+      recognitionRef.current = null;
+    }
     if (audioRecorderRef.current) {
-      audioRecorderRef.current.cleanup();
+      try {
+        audioRecorderRef.current.cleanup();
+      } catch {}
       audioRecorderRef.current = null;
     }
     setWaveformLevels(Array(24).fill(6));
   };
 
-  // Clean up when modal closes
+  // Clean up when modal opens or closes
   useEffect(() => {
     if (!isOpen) {
-      stopListening();
+      cleanupAudio();
+      setIsListening(false);
+      isListeningRef.current = false;
       setParsedResult(null);
       setTranscript('');
       transcriptRef.current = '';
@@ -65,96 +79,136 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
     }
   }, [isOpen]);
 
-  const startListening = async () => {
-    try {
-      setIsListening(true);
-      isListeningRef.current = true;
-      setTranscript('');
-      transcriptRef.current = '';
-      setParsedResult(null);
-      setIsTranscribing(false);
+  const startWaveAnimation = () => {
+    if (waveIntervalRef.current) {
+      clearInterval(waveIntervalRef.current);
+    }
+    waveIntervalRef.current = setInterval(() => {
+      setWaveformLevels(
+        Array.from({ length: 24 }, (_, i) => {
+          const factor = Math.sin((i / 24) * Math.PI);
+          return Math.max(5, Math.round(factor * (12 + Math.random() * 16)));
+        })
+      );
+    }, 85);
+  };
 
-      // 1. Initialize Audio Recorder with live visualizer
+  // Synchronous start to ensure browser user-gesture token is preserved across all clicks
+  const startListening = () => {
+    cleanupAudio();
+
+    setIsListening(true);
+    isListeningRef.current = true;
+    setTranscript('');
+    transcriptRef.current = '';
+    setParsedResult(null);
+    setIsTranscribing(false);
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+        recognition.lang = navigator.language || 'en-IN';
+
+        recognition.onstart = () => {
+          setIsListening(true);
+          isListeningRef.current = true;
+          startWaveAnimation();
+        };
+
+        recognition.onresult = (event: any) => {
+          let currentText = '';
+          for (let i = 0; i < event.results.length; i++) {
+            currentText += event.results[i][0].transcript;
+          }
+          if (currentText.trim()) {
+            setTranscript(currentText);
+            transcriptRef.current = currentText;
+            setInputText(currentText);
+          }
+
+          if (silenceTimeoutRef.current) {
+            clearTimeout(silenceTimeoutRef.current);
+          }
+
+          const last = event.results[event.results.length - 1];
+          if (last && last.isFinal && currentText.trim()) {
+            stopListening();
+            handleFinalTranscript(currentText);
+            return;
+          }
+
+          // Auto-cutoff 1.1s after user stops speaking
+          if (currentText.trim()) {
+            silenceTimeoutRef.current = setTimeout(() => {
+              if (isListeningRef.current) {
+                const textToProcess = transcriptRef.current || currentText;
+                stopListening();
+                if (textToProcess.trim()) {
+                  handleFinalTranscript(textToProcess);
+                }
+              }
+            }, 1100);
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          setIsListening(false);
+          isListeningRef.current = false;
+          cleanupAudio();
+
+          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            setTranscript('Microphone permission was denied. Please allow microphone access in settings.');
+          } else if (event.error === 'no-speech') {
+            if (!transcriptRef.current.trim()) {
+              setTranscript("Didn't catch any speech. Tap mic and try again or type below.");
+            }
+          }
+        };
+
+        recognition.onend = () => {
+          setIsListening(false);
+          isListeningRef.current = false;
+          cleanupAudio();
+
+          const finalText = transcriptRef.current || inputText;
+          if (finalText.trim()) {
+            handleFinalTranscript(finalText);
+          }
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
+        return;
+      } catch (err: any) {
+        console.warn('SpeechRecognition startup error:', err);
+      }
+    }
+
+    // Fallback: Audio Recorder for environments without Web Speech API
+    startAudioRecorderFallback();
+  };
+
+  const startAudioRecorderFallback = async () => {
+    try {
       const recorder = new AudioVoiceRecorder();
       audioRecorderRef.current = recorder;
       await recorder.start((levels) => {
         setWaveformLevels(levels);
       });
-
-      // 2. Also attach SpeechRecognition if supported
-      const SpeechRecognition =
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-      if (SpeechRecognition) {
-        try {
-          if (recognitionRef.current) {
-            try {
-              recognitionRef.current.abort();
-            } catch {}
-          }
-
-          const recognition = new SpeechRecognition();
-          recognition.continuous = false;
-          recognition.interimResults = true;
-          recognition.maxAlternatives = 1;
-          recognition.lang = navigator.language || 'en-IN';
-
-          recognition.onresult = (event: any) => {
-            let currentText = '';
-            for (let i = 0; i < event.results.length; i++) {
-              currentText += event.results[i][0].transcript;
-            }
-            if (currentText.trim()) {
-              setTranscript(currentText);
-              transcriptRef.current = currentText;
-              setInputText(currentText);
-            }
-
-            if (silenceTimeoutRef.current) {
-              clearTimeout(silenceTimeoutRef.current);
-            }
-
-            const last = event.results[event.results.length - 1];
-            if (last && last.isFinal && currentText.trim()) {
-              stopListening();
-              handleFinalTranscript(currentText);
-              return;
-            }
-
-            // Silence auto-stop
-            if (currentText.trim()) {
-              silenceTimeoutRef.current = setTimeout(() => {
-                if (isListeningRef.current) {
-                  stopListening();
-                  handleFinalTranscript(transcriptRef.current || currentText);
-                }
-              }, 1200);
-            }
-          };
-
-          recognition.onerror = () => {
-            // SpeechRecognition may fail in restricted WebViews, AudioVoiceRecorder keeps recording!
-          };
-
-          recognition.onend = () => {
-            if (isListeningRef.current && transcriptRef.current.trim()) {
-              stopListening();
-              handleFinalTranscript(transcriptRef.current);
-            }
-          };
-
-          recognitionRef.current = recognition;
-          recognition.start();
-        } catch (e) {
-          console.warn('SpeechRecognition start notice:', e);
-        }
-      }
-    } catch (err: any) {
-      console.error('Error starting voice recording:', err);
+      setIsListening(true);
+      isListeningRef.current = true;
+    } catch (err) {
+      console.error('Audio recorder error:', err);
       setIsListening(false);
       isListeningRef.current = false;
       cleanupAudio();
-      setTranscript('Microphone access was denied or not available. You can type below.');
+      setTranscript('Could not access microphone. You can type below.');
     }
   };
 
@@ -167,10 +221,16 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       silenceTimeoutRef.current = null;
     }
 
+    if (waveIntervalRef.current) {
+      clearInterval(waveIntervalRef.current);
+      waveIntervalRef.current = null;
+    }
+
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
       } catch {}
+      recognitionRef.current = null;
     }
 
     let audioBlob: Blob | null = null;
@@ -189,7 +249,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       return;
     }
 
-    // If client SpeechRecognition did not yield words, transcribe audio blob via backend
+    // If audio blob was recorded and no text yet, transcribe via backend
     if (audioBlob && audioBlob.size > 1000) {
       setIsTranscribing(true);
       try {
@@ -218,8 +278,7 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
       }
     }
 
-    // If still no speech detected
-    if (!transcriptRef.current.trim()) {
+    if (!transcriptRef.current.trim() && !inputText.trim()) {
       setTranscript("Didn't catch any speech. Tap mic and try again or type below.");
     }
   };
@@ -397,7 +456,6 @@ export const VoiceSheet: React.FC<VoiceSheetProps> = ({ isOpen, onClose, onSaved
             {/* Clean Manual Input Form */}
             <form onSubmit={handleInputSubmit} className="w-full flex items-center gap-2 bg-white rounded-2xl p-1.5 shadow-sm border border-black/10">
               <input
-                ref={inputRef}
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
