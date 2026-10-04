@@ -14,7 +14,6 @@
   },
   "dependencies": {
     "@astrojs/cloudflare": "^14.3.3",
-    "@emnapi/runtime": "^1.11.3",
     "astro": "^7.3.5",
     "wrangler": "^4.147.0"
   },
