@@ -30,7 +30,7 @@ export function initExpenseStore() {
   fetch('/api/expenses')
     .then((res) => (res.ok ? res.json() : null))
     .then((data) => {
-      if (data && Array.isArray(data.expenses)) {
+      if (data && Array.isArray(data.expenses) && data.expenses.length > 0) {
         const cloudExpenses: ExpenseItem[] = data.expenses.map((e: any) => ({
           id: e.id,
           title: e.label,
@@ -42,9 +42,20 @@ export function initExpenseStore() {
             day: 'numeric'
           })
         }));
-        expensesStore.set(cloudExpenses);
+
+        const currentLocal = expensesStore.get();
+        const combined = [...cloudExpenses];
+
+        // Keep local expenses that are not yet in cloud
+        for (const local of currentLocal) {
+          if (!combined.some((c) => c.id === local.id || (c.title === local.title && c.amountPaise === local.amountPaise))) {
+            combined.unshift(local);
+          }
+        }
+
+        expensesStore.set(combined);
         try {
-          localStorage.setItem('drip_local_expenses', JSON.stringify(cloudExpenses));
+          localStorage.setItem('drip_local_expenses', JSON.stringify(combined));
         } catch {}
       }
     })
